@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<!-- skill:chrome -->
+<style>
+/* Credit line — bottom-right */
+.design-ui-credit {
+  position: fixed;
+  bottom: 12px;
+  right: 12px;
+  font: 11px/1 system-ui, sans-serif;
+  color: rgba(128,128,128,0.5);
+  pointer-events: none;
+  z-index: 2147483647;
+  transition: opacity 0.4s ease;
+  user-select: none;
+  letter-spacing: 0.02em;
+}
+
+/* Hide chrome on touch devices */
+@media (hover: none) {
+  .design-ui-credit { display: none; }
+}
+
+/* Print fixes */
+@media print {
+  * {
+    transition: none !important;
+    animation: none !important;
+    box-shadow: none !important;
+  }
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .design-ui-credit { display: none !important; }
+}
+
+</style>
+<script>
+(function () {
+    // Design-ui pages are single compositions, so the whole body is editable.
+    function markEditable() {
+        document.body.classList.add('artifact-editable');
+    }
+
+    // Credit badge with idle-fade. Hover devices only.
+    function initChromeUI() {
+        if (!matchMedia('(hover: hover)').matches) return;
+
+        var credit = document.createElement('div');
+        credit.className = 'design-ui-credit';
+        credit.setAttribute('aria-hidden', 'true');
+        credit.innerHTML = '\u{1F49C} by ClickUp Brain';
+        document.body.appendChild(credit);
+
+        var timer = null;
+        var fade = function (out) { credit.style.opacity = out ? '0' : ''; };
+        fade(true);
+        var show = function () {
+            fade(false);
+            clearTimeout(timer);
+            timer = setTimeout(function () { fade(true); }, 3000);
+        };
+        document.addEventListener('mousemove', show);
+        show();
+    }
+
+    function init() {
+        markEditable();
+        initChromeUI();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+
+</script>
+<!-- /skill:chrome -->
+<!-- skill:libraries -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js" integrity="sha384-XcdcwHqIPULERb2yDEM4R0XaQKU3YnDsrTmjACBZyfdVVqjh6xQ4/DCMd7XLcA6Y" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<!-- /skill:libraries -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reduções ALCOB | Análises de Cobre</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:oklch(96% 0.005 55);--sf:oklch(99.5% 0.003 55);--bd:oklch(89% 0.008 55);--t1:oklch(22% 0.01 55);--t2:oklch(45% 0.012 55);--tm:oklch(58% 0.008 55);--ac:oklch(50% 0.14 145);--al:oklch(94% 0.03 145);--dn:oklch(52% 0.16 25);--sc:oklch(48% 0.12 155);--wn:oklch(58% 0.14 70);--bl:oklch(50% 0.12 250)}
+html,body{height:100%;overflow:hidden;font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t1)}
+.app{height:100vh;display:grid;grid-template-rows:auto auto 1fr;overflow:hidden}
+.header{display:flex;align-items:center;gap:10px;padding:8px 18px;border-bottom:1px solid var(--bd);background:var(--sf)}
+.logo{display:flex;align-items:center;gap:7px}
+.logo svg{width:28px;height:28px}
+.logo-name{font-size:1rem;font-weight:800;color:oklch(45% 0.1 55)}
+.logo-sub{font-size:0.48rem;font-weight:600;color:var(--ac);letter-spacing:.05em;text-transform:uppercase}
+.hctl{margin-left:auto;display:flex;align-items:center;gap:10px}
+.csel{padding:4px 9px;border-radius:5px;border:1px solid var(--bd);font-size:.62rem;font-family:'JetBrains Mono',monospace;background:var(--bg);color:var(--t1)}
+.hist-count{font-size:.55rem;font-weight:600;color:var(--tm)}
+.ocr-badge{font-size:.5rem;font-weight:700;padding:3px 6px;border-radius:4px;background:oklch(94% .025 250);color:oklch(45% .12 250)}
+.cloud-user{font-size:.5rem;color:var(--tm);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.btn-logout{padding:3px 7px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);font-size:.48rem;font-weight:600;color:var(--t2);cursor:pointer}
+.sync-pill{font-size:.48rem;font-weight:700;color:var(--sc)}
+.sync-pill.err{color:var(--dn)}
+.tabs{display:flex;gap:2px;padding:5px 18px;background:oklch(94% .005 55);border-bottom:1px solid var(--bd)}
+.tb{padding:5px 13px;font-size:.62rem;font-weight:600;border-radius:5px;cursor:pointer;color:var(--tm);border:none;background:transparent;transition:all .12s}
+.tb:hover{color:var(--t1)}
+.tb.on{background:var(--sf);color:var(--t1);box-shadow:0 1px 2px oklch(30% .01 55/.08)}
+.main{overflow:hidden;position:relative}
+.pnl{position:absolute;inset:0;overflow-y:auto;padding:12px 18px 16px;display:none}
+.pnl.on{display:block}
+
+/* Fotos */
+.fotos-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.fotos-header h2{font-size:.82rem;font-weight:800}
+.fotos-header p{font-size:.58rem;color:var(--tm)}
+.fotos-header .btn-new{margin-left:auto;padding:5px 12px;border-radius:5px;font-size:.6rem;font-weight:600;background:var(--ac);color:oklch(98% .01 145);border:none;cursor:pointer}
+.corrida-info{display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:7px 10px;background:var(--sf);border:1px solid var(--bd);border-radius:7px;flex-wrap:wrap}
+.corrida-info label{font-size:.55rem;font-weight:600;color:var(--t2)}
+.corrida-info input,.corrida-info select{padding:4px 7px;border:1px solid var(--bd);border-radius:4px;font-size:.6rem;background:var(--bg)}
+.corrida-info input:focus,.corrida-info select:focus{outline:none;border-color:var(--ac)}
+.btn-save{padding:5px 14px;border-radius:5px;font-size:.58rem;font-weight:700;background:var(--sc);color:oklch(98% .01 155);border:none;cursor:pointer;margin-left:auto}
+.btn-save:hover{background:oklch(42% .12 155)}
+.samples-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.sample-card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.sample-card.active{border-color:var(--ac)}
+.sample-card-head{display:flex;align-items:center;padding:6px 8px;background:oklch(95% .004 55);border-bottom:1px solid var(--bd);gap:5px}
+.sample-card-head .num{font-size:.65rem;font-weight:800;color:var(--ac)}
+.sample-card-head .status{margin-left:auto;font-size:.46rem;font-weight:700;padding:2px 5px;border-radius:3px}
+.status-ok{background:oklch(94% .03 155);color:var(--sc)}
+.status-empty{background:oklch(94% .01 55);color:var(--tm)}
+.sample-card-head .btn-del{width:18px;height:18px;border-radius:3px;border:none;background:transparent;cursor:pointer;font-size:.7rem;color:var(--tm)}
+.sample-card-head .btn-del:hover{color:var(--dn)}
+.sample-photo{position:relative;width:100%;height:110px;background:oklch(94% .006 55);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sample-photo img{width:100%;height:100%;object-fit:cover}
+.sample-photo .ph{text-align:center;color:var(--tm)}
+.sample-photo .ph svg{width:22px;height:22px;stroke:oklch(75% .01 55);margin-bottom:2px}
+.sample-photo .ph p{font-size:.48rem}
+.sample-photo input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer}
+.ocr-panel{padding:6px 8px;background:oklch(97% .004 55);border-top:1px solid var(--bd);border-bottom:1px solid var(--bd)}
+.ocr-line{display:flex;align-items:center;gap:6px;font-size:.49rem;color:var(--tm)}
+.ocr-line strong{color:var(--t2);font-weight:700}
+.ocr-found{margin-left:auto;font-family:'JetBrains Mono',monospace}
+.ocr-progress{height:3px;background:oklch(90% .008 55);border-radius:99px;overflow:hidden;margin-top:4px}
+.ocr-progress span{display:block;height:100%;width:0;background:var(--ac);transition:width .2s}
+.ocr-actions{display:flex;gap:5px;margin-top:5px}
+.ocr-actions button{padding:3px 7px;border-radius:4px;border:1px solid var(--bd);background:var(--sf);font-size:.48rem;font-weight:600;color:var(--t2);cursor:pointer}
+.ocr-actions button:hover{border-color:var(--ac);color:var(--ac)}
+.ocr-actions button:disabled{opacity:.45;cursor:wait}
+.ocr-panel.ok{background:oklch(96% .02 145)}
+.ocr-panel.err{background:oklch(96% .025 25)}
+.sample-data{padding:5px 7px;max-height:160px;overflow-y:auto}
+.sdr{display:grid;grid-template-columns:46px 1fr;gap:2px;margin-bottom:1px;align-items:center}
+.sdr label{font-size:.5rem;font-weight:600;color:var(--t2)}
+.sdr input{width:100%;padding:2px 4px;border:1px solid oklch(92% .005 55);border-radius:3px;font-size:.52rem;font-family:'JetBrains Mono',monospace;text-align:right;background:oklch(98% .003 55)}
+.sdr input:focus{outline:none;border-color:var(--ac)}
+.sdr input.filled{background:oklch(96% .015 145);border-color:oklch(85% .04 145)}
+.sdr input.auto{background:oklch(95% .025 250);border-color:oklch(82% .05 250)}
+
+/* Archived runs */
+.archive-section{margin-top:16px;padding-top:12px;border-top:1px solid var(--bd)}
+.archive-section h3{font-size:.7rem;font-weight:700;margin-bottom:8px;color:var(--t2)}
+.archive-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.arc-card{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .12s}
+.arc-card:hover{border-color:var(--ac)}
+.arc-card.sel{border-color:var(--ac);background:var(--al)}
+.arc-card .arc-code{font-size:.65rem;font-weight:700}
+.arc-card .arc-meta{font-size:.5rem;color:var(--tm);margin-top:2px}
+.arc-card .arc-cu{font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:700;color:var(--sc);margin-top:3px}
+.arc-top{display:flex;align-items:flex-start;gap:8px}
+.arc-main{min-width:0;flex:1}
+.arc-thumb{width:42px;height:52px;object-fit:cover;border-radius:4px;border:1px solid var(--bd);background:var(--sf)}
+.arc-attach{margin-top:6px;padding:3px 7px;border:1px solid var(--bd);background:var(--sf);border-radius:4px;font-size:.48rem;font-weight:600;color:var(--t2);cursor:pointer}
+.arc-attach:hover{border-color:var(--ac);color:var(--ac)}
+.arc-actions{display:flex;align-items:center;gap:5px;margin-top:6px}
+.arc-actions .arc-attach{margin-top:0}
+.arc-delete{margin-left:auto;padding:3px 7px;border:1px solid oklch(85% .04 25);background:oklch(97% .012 25);border-radius:4px;font-size:.48rem;font-weight:700;color:var(--dn);cursor:pointer}
+.arc-delete:hover{background:oklch(93% .03 25);border-color:var(--dn)}
+
+/* Photo viewer */
+.photo-modal{position:fixed;inset:0;z-index:1000;background:oklch(12% .01 55/.78);display:none;align-items:center;justify-content:center;padding:18px}
+.photo-modal.on{display:flex}
+.photo-box{position:relative;width:min(920px,96vw);height:min(92vh,900px);background:var(--sf);border-radius:10px;display:grid;grid-template-rows:auto 1fr auto;overflow:hidden;box-shadow:0 20px 70px oklch(5% .01 55/.4)}
+.photo-head{display:flex;align-items:center;padding:9px 12px;border-bottom:1px solid var(--bd);gap:8px}
+.photo-head strong{font-size:.7rem}
+.photo-head span{font-size:.52rem;color:var(--tm)}
+.photo-close{margin-left:auto;width:26px;height:26px;border:0;border-radius:5px;background:var(--bg);cursor:pointer;font-size:1rem;color:var(--t2)}
+.photo-stage{min-height:0;background:oklch(18% .008 55);display:flex;align-items:center;justify-content:center;overflow:auto}
+.photo-stage img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.photo-nav{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px;border-top:1px solid var(--bd)}
+.photo-nav button{padding:5px 11px;border-radius:5px;border:1px solid var(--bd);background:var(--bg);font-size:.55rem;font-weight:600;cursor:pointer}
+.photo-nav button:disabled{opacity:.35}
+.photo-nav span{font-size:.52rem;color:var(--tm);font-family:'JetBrains Mono',monospace}
+
+/* Authentication */
+.auth-overlay{position:fixed;inset:0;z-index:2000;background:linear-gradient(145deg,oklch(94% .02 145),oklch(94% .015 55));display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-overlay.hidden{display:none}
+.auth-card{width:min(390px,94vw);background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:24px;box-shadow:0 24px 80px oklch(20% .02 55/.16)}
+.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.auth-mark{width:38px;height:38px;border-radius:50%;border:4px double oklch(55% .13 50);display:grid;place-items:center;color:oklch(45% .1 55);font-weight:800}
+.auth-card h1{font-size:1.05rem}.auth-card .lead{font-size:.66rem;color:var(--tm);margin-top:3px}
+.auth-card label{display:block;font-size:.58rem;font-weight:700;color:var(--t2);margin:11px 0 4px}
+.auth-card input{width:100%;padding:9px 10px;border:1px solid var(--bd);border-radius:7px;background:var(--bg);font-size:.72rem}
+.auth-card input:focus{outline:none;border-color:var(--ac)}
+.auth-buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:14px}
+.auth-buttons button{padding:9px;border:0;border-radius:7px;font-size:.65rem;font-weight:700;cursor:pointer}
+.auth-primary{background:var(--ac);color:white}.auth-secondary{background:var(--bg);color:var(--t2);border:1px solid var(--bd)!important}
+.auth-message{min-height:32px;margin-top:10px;font-size:.56rem;line-height:1.4;color:var(--tm)}
+.auth-message.err{color:var(--dn)}.auth-message.ok{color:var(--sc)}
+.loading-overlay{position:fixed;inset:0;z-index:1900;background:oklch(98% .003 55/.88);display:none;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--t2)}
+.loading-overlay.on{display:flex}
+
+/* Metrics */
+.mrow{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}
+.mc{background:var(--sf);border:1px solid var(--bd);border-radius:7px;padding:8px 10px}
+.mc .lb{font-size:.5rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--tm);margin-bottom:2px}
+.mc .vl{font-family:'JetBrains Mono',monospace;font-size:1rem;font-weight:700}
+.mc .sb{font-size:.48rem;font-weight:600;margin-top:1px}
+.su{color:var(--sc)}.sd{color:var(--dn)}.sn{color:var(--tm)}
+
+/* Tables */
+.tw{background:var(--sf);border:1px solid var(--bd);border-radius:8px;overflow:hidden}
+.ts{overflow:auto;max-height:calc(100vh - 200px)}
+table{width:100%;border-collapse:collapse;font-size:.56rem;font-feature-settings:'tnum'}
+thead{position:sticky;top:0;z-index:2}
+th{background:oklch(95% .004 55);padding:5px 6px;text-align:right;font-weight:700;font-size:.5rem;text-transform:uppercase;letter-spacing:.03em;color:var(--t2);border-bottom:1.5px solid var(--bd);white-space:nowrap}
+th:first-child{text-align:left;position:sticky;left:0;z-index:3;background:oklch(95% .004 55)}
+td{padding:4px 6px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.53rem;border-bottom:1px solid oklch(94% .003 55)}
+td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:600;position:sticky;left:0;background:var(--sf);z-index:1}
+tr:hover td{background:oklch(96% .006 145/.3)}
+.vh{color:var(--dn);font-weight:600}.vl2{color:var(--sc);font-weight:600}
+.vp{color:var(--sc)}.vn{color:var(--dn)}
+
+/* Charts */
+.cg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.cb{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:10px 12px;overflow:hidden}
+.cb.full{grid-column:1/-1}
+.cb h4{font-size:.6rem;font-weight:700;margin-bottom:1px}
+.cb p{font-size:.47rem;color:var(--tm);margin-bottom:6px}
+.ca{width:100%;height:140px;max-height:140px;display:block}
+.ca.md{height:155px;max-height:155px}
+
+/* Dashboard */
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dg .full{grid-column:1/-1}
+.sl{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.si{display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;background:var(--bg);font-size:.53rem}
+.bdg{font-size:.44rem;padding:1px 4px;border-radius:3px;font-weight:700}
+.bok{background:oklch(94% .03 155);color:var(--sc)}
+.bno{background:oklch(93% .03 25);color:var(--dn)}
+
+/* Vilões */
+.vilao-list{margin-top:4px}
+.vilao-item{display:flex;align-items:center;gap:5px;padding:5px 7px;margin-bottom:3px;border-radius:5px;background:var(--bg)}
+.vilao-rank{font-size:.65rem;font-weight:800;width:18px;text-align:center}
+.vilao-rank.r1{color:var(--dn)}.vilao-rank.r2{color:var(--wn)}.vilao-rank.r3{color:oklch(55% .08 55)}
+.vilao-el{font-size:.62rem;font-weight:700;flex:1}
+.vilao-vals{text-align:right}
+.vilao-final{font-family:'JetBrains Mono',monospace;font-size:.58rem;font-weight:700;color:var(--dn)}
+.vilao-limit{font-size:.44rem;color:var(--tm)}
+.vilao-bar{height:3px;border-radius:2px;margin-top:2px;background:oklch(92% .005 55);width:100%;position:relative;overflow:hidden}
+.vilao-bar-fill{height:100%;border-radius:2px;position:absolute;left:0;top:0}
+
+/* Comparativo */
+.comp-row{display:grid;grid-template-columns:44px 1fr 14px 1fr;align-items:center;gap:2px;padding:2px 5px;font-size:.5rem}
+.comp-row:nth-child(odd){background:oklch(97% .003 55)}
+.comp-row .cel{font-weight:600;color:var(--t2)}
+.comp-row .cv{font-family:'JetBrains Mono',monospace;text-align:right}
+.comp-hdr{display:grid;grid-template-columns:44px 1fr 14px 1fr;padding:3px 5px;font-size:.46rem;font-weight:700;text-transform:uppercase;color:var(--tm);margin-bottom:2px}
+
+/* Reduction highlight */
+.red-item{display:flex;align-items:center;gap:5px;padding:4px 7px;margin-bottom:3px;border-radius:5px;background:var(--bg)}
+.red-item .red-el{font-size:.6rem;font-weight:700;width:24px}
+.red-item .red-vals{flex:1;font-size:.5rem;color:var(--t2);font-family:'JetBrains Mono',monospace}
+.red-item .red-pct{font-size:.65rem;font-weight:800;color:var(--sc)}
+
+@media(max-width:900px){.mrow{grid-template-columns:1fr 1fr}.cg,.dg{grid-template-columns:1fr}.samples-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="logo">
+      <svg viewBox="0 0 28 28"><circle cx="14" cy="14" r="12" fill="none" stroke="oklch(65% .1 55)" stroke-width="1.6"/><circle cx="14" cy="14" r="8" fill="none" stroke="oklch(60% .12 55)" stroke-width="1.2"/><circle cx="14" cy="14" r="4" fill="none" stroke="oklch(55% .13 50)" stroke-width=".9"/><circle cx="14" cy="14" r="1.8" fill="oklch(60% .12 55)"/></svg>
+      <div><div class="logo-name">Alcob</div><div class="logo-sub">eco vergalhão ♻</div></div>
+    </div>
+    <div class="hctl">
+      <span class="ocr-badge">OCR + Supabase</span>
+      <select class="csel" id="sel" onchange="sw(this.value)"></select>
+      <span class="hist-count" id="histCount"></span>
+      <span class="sync-pill" id="syncPill">offline</span>
+      <span class="cloud-user" id="cloudUser"></span>
+      <button class="btn-logout" id="logoutBtn" type="button" onclick="signOutUser()">Sair</button>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tb on" data-t="fotos" onclick="go('fotos')">📷 Amostras</button>
+    <button class="tb" data-t="planilha" onclick="go('planilha')">📊 Planilha</button>
+    <button class="tb" data-t="reducoes" onclick="go('reducoes')">📉 Reduções</button>
+    <button class="tb" data-t="graficos" onclick="go('graficos')">📈 Gráficos</button>
+    <button class="tb" data-t="dashboard" onclick="go('dashboard')">🎯 Dashboard</button>
+  </div>
+
+  <div class="main">
+    <!-- FOTOS -->
+    <div class="pnl on" id="p-fotos">
+      <div class="fotos-header">
+        <div><h2>📷 Nova Corrida</h2><p>Envie a foto: o laudo será lido e os valores preenchidos para conferência.</p></div>
+        <button class="btn-new" onclick="addSample()">+ Amostra</button>
+      </div>
+      <div class="corrida-info">
+        <label>Data:</label><input type="date" id="runDate" onchange="current.date=this.value">
+        <label>Corrida:</label><input type="text" id="runCode" placeholder="Código" style="width:130px" oninput="current.code=this.value">
+        <label>Turno:</label><select id="runTurno" onchange="current.turno=this.value"><option>A (06-14h)</option><option>B (14-22h)</option><option>C (22-06h)</option></select>
+        <button class="btn-save" id="saveBtn" onclick="saveAndClear()">💾 Salvar e Arquivar</button>
+      </div>
+      <div class="samples-grid" id="sGrid"></div>
+      <div class="archive-section">
+        <h3>📁 Corridas Arquivadas (<span id="arcCount">0</span>)</h3>
+        <div class="archive-list" id="arcList"></div>
+      </div>
+    </div>
+
+    <!-- PLANILHA -->
+    <div class="pnl" id="p-planilha">
+      <div class="mrow" id="mP"></div>
+      <div class="tw"><div class="ts"><table><thead><tr id="thP"></tr></thead><tbody id="tbP"></tbody></table></div></div>
+    </div>
+
+    <!-- REDUÇÕES -->
+    <div class="pnl" id="p-reducoes">
+      <div class="cg"><div class="cb full"><h4>Redução Total (1ª → última)</h4><p>% removido</p><canvas id="cRB" class="ca md"></canvas></div></div>
+      <div class="tw"><div class="ts"><table><thead><tr id="thR"></tr></thead><tbody id="tbR"></tbody></table></div></div>
+    </div>
+
+    <!-- GRÁFICOS -->
+    <div class="pnl" id="p-graficos">
+      <div class="cg">
+        <div class="cb full"><h4>Pureza Cu (%)</h4><p>Evolução</p><canvas id="cCu" class="ca"></canvas></div>
+        <div class="cb"><h4>Pb</h4><p>&lt;0.055%</p><canvas id="cPb" class="ca"></canvas></div>
+        <div class="cb"><h4>Sn</h4><p>&lt;0.005%</p><canvas id="cSn" class="ca"></canvas></div>
+        <div class="cb"><h4>Fe</h4><p>&lt;0.002%</p><canvas id="cFe" class="ca"></canvas></div>
+        <div class="cb"><h4>Zn</h4><p>&lt;0.005%</p><canvas id="cZn" class="ca"></canvas></div>
+        <div class="cb"><h4>Ni</h4><p>&lt;0.010%</p><canvas id="cNi" class="ca"></canvas></div>
+        <div class="cb"><h4>Sb</h4><p>&lt;0.0005%</p><canvas id="cSb" class="ca"></canvas></div>
+        <div class="cb full"><h4>Todos os Elementos Detectados (log)</h4><p>Atualizado automaticamente quando um novo elemento é incluído</p><canvas id="cDyn" class="ca md"></canvas></div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="pnl" id="p-dashboard">
+      <div class="mrow" id="mD"></div>
+      <div class="dg">
+        <div class="cb full"><h4>Impurezas Críticas (log)</h4><p>Visão unificada</p><canvas id="cAll" class="ca md"></canvas></div>
+        <div class="cb">
+          <h4>🏆 Vilões da Corrida</h4>
+          <p>Ranking: valor final vs. limite de processo</p>
+          <div id="vilaoList" class="vilao-list"></div>
+        </div>
+        <div class="cb">
+          <h4>🚀 Maiores Reduções</h4>
+          <p>Pico mais alto → menor valor encontrado entre amostras</p>
+          <div id="redList"></div>
+        </div>
+      </div>
+      <div class="cg" style="margin-top:8px">
+        <div class="cb">
+          <h4>⚡ Comparativo 1ª vs Última</h4>
+          <p>Química inicial e final</p>
+          <div id="compDiv"></div>
+        </div>
+        <div class="cb"><h4>Total Impurezas</h4><p>Soma por amostra (pico → mínimo = maior redução)</p><canvas id="cCm" class="ca"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-brand"><div class="auth-mark">Cu</div><div><h1>Reduções ALCOB</h1><p class="lead">Histórico centralizado de análises químicas</p></div></div>
+    <label for="authEmail">E-mail</label>
+    <input type="email" id="authEmail" autocomplete="username" placeholder="seu.email@alcob.com.br">
+    <label for="authPassword">Senha</label>
+    <input type="password" id="authPassword" autocomplete="current-password" placeholder="Mínimo de 8 caracteres">
+    <div class="auth-buttons">
+      <button class="auth-primary" type="button" onclick="signInUser()">Entrar</button>
+      <button class="auth-secondary" type="button" onclick="signUpUser()">Criar conta</button>
+    </div>
+    <p class="auth-message" id="authMessage">Use uma conta autorizada para acessar o histórico compartilhado.</p>
+  </div>
+</div>
+<div class="loading-overlay" id="loadingOverlay">Sincronizando dados com o servidor…</div>
+
+<div class="photo-modal" id="photoModal" onclick="closePhotoModal(event)">
+  <div class="photo-box" onclick="event.stopPropagation()">
+    <div class="photo-head">
+      <strong id="photoTitle">Laudo anexado</strong>
+      <span id="photoSubtitle"></span>
+      <button class="photo-close" type="button" onclick="closePhotoModal()" aria-label="Fechar">×</button>
+    </div>
+    <div class="photo-stage"><img id="photoFull" alt="Foto do laudo anexado"></div>
+    <div class="photo-nav">
+      <button id="photoPrev" type="button" onclick="movePhoto(-1)">← Anterior</button>
+      <span id="photoCounter"></span>
+      <button id="photoNext" type="button" onclick="movePhoto(1)">Próxima →</button>
+    </div>
+  </div>
+</div>
+<script>
+const REPORT_ORDER=['Base (Cu)','Pb','Ni','Sn','Ag','Zn','Fe','Sb','Te','P','S','As','Se','Ti','Hg','B','Cr','Si','Al','Bi','Co','Mn','Cd','Mg','Zr','Cu+Ag'];
+const PERIODIC_SYMBOLS=new Set('H He Li Be B C N O F Ne Na Mg Al Si P S Cl Ar K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe Cs Ba La Ce Pr Nd Pm Sm Eu Gd Tb Dy Ho Er Tm Yb Lu Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn Fr Ra Ac Th Pa U Np Pu Am Cm Bk Cf Es Fm Md No Lr Rf Db Sg Bh Hs Mt Ds Rg Cn Nh Fl Mc Lv Ts Og'.split(' '));
+let INP=[...REPORT_ORDER];
+
+// LIMITES ATUALIZADOS
+const LM={Pb:.0550,Zn:.0050,Sn:.0050,Ni:.0100,Fe:.0020,Sb:.0005,S:.0005,P:.0005,Si:.0005,Al:.0005,Cr:.0005,Ag:.0005,Bi:.0005};
+
+// STORE
+let archive=[];
+let current={date:new Date().toISOString().split('T')[0],code:'',turno:'A (06-14h)',samples:[{photo:null,data:{}}]};
+let viewId=null; // null = viewing current draft, string = viewing archived
+
+function impurityElements(){return INP.filter(el=>el!=='Base (Cu)'&&el!=='Cu+Ag')}
+function normalizeElementName(raw){
+  const clean=String(raw||'').replace(/[^A-Za-z+()]/g,'');
+  if(/^Base\(?Cu\)?$/i.test(clean))return'Base (Cu)';
+  if(/^Cu\+Ag$/i.test(clean))return'Cu+Ag';
+  if(!/^[A-Za-z]{1,2}$/.test(clean))return null;
+  const symbol=clean[0].toUpperCase()+clean.slice(1).toLowerCase();
+  return PERIODIC_SYMBOLS.has(symbol)?symbol:null;
+}
+function registerElements(names){
+  const added=[];
+  names.map(normalizeElementName).filter(Boolean).forEach(el=>{
+    if(INP.includes(el))return;
+    const pos=INP.indexOf('Cu+Ag');INP.splice(pos<0?INP.length:pos,0,el);added.push(el);
+    archive.forEach(r=>(r.samples||[]).forEach(s=>{if(!s.data)s.data={};if(!(el in s.data))s.data[el]=0}));
+    current.samples.forEach(s=>{if(!s.data)s.data={};if(!(el in s.data))s.data[el]=0});
+  });
+  return added;
+}
+
+let supabaseClient=null,authUser=null,activeAccessToken;
+
+function setCloudLoading(on,message='Sincronizando dados com o servidor…'){
+  const overlay=document.getElementById('loadingOverlay');
+  overlay.textContent=message;overlay.classList.toggle('on',!!on);
+  const save=document.getElementById('saveBtn');if(save)save.disabled=!!on;
+}
+function setSyncPill(message,isError=false){
+  const pill=document.getElementById('syncPill');pill.textContent=message;pill.classList.toggle('err',isError);
+}
+function showAuthMessage(message,isError=false){
+  const box=document.getElementById('authMessage');box.textContent=message;box.style.color=isError?'var(--dn)':'var(--tm)';
+}
+function esc(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]))}
+
+async function initCloud(){
+  const cfg=window.REDUCOES_CONFIG||{};
+  if(!window.supabase||!cfg.supabaseUrl||!cfg.supabasePublishableKey||cfg.supabaseUrl.includes('__')){
+    showAuthMessage('A conexão com o banco ainda não foi configurada.',true);setSyncPill('sem conexão',true);return;
+  }
+  supabaseClient=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
+    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+  });
+  const {data,error}=await supabaseClient.auth.getSession();
+  if(error){showAuthMessage(error.message,true);setSyncPill('erro',true);return;}
+  await applySession(data.session);
+  supabaseClient.auth.onAuthStateChange((_event,session)=>setTimeout(()=>applySession(session),0));
+}
+async function applySession(session){
+  const token=session?.access_token||null;
+  if(activeAccessToken===token)return;
+  activeAccessToken=token;authUser=session?.user||null;
+  document.getElementById('authOverlay').classList.toggle('hidden',!!authUser);
+  document.getElementById('cloudUser').textContent=authUser?.email||'';
+  document.getElementById('logoutBtn').style.display=authUser?'inline-block':'none';
+  if(!authUser){archive=[];viewId=null;setSyncPill('aguardando login');uS();renderFotos();return;}
+  showAuthMessage('Conta conectada.');
+  await loadCloudData();
+}
+async function signInUser(){
+  if(!supabaseClient)return;
+  const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;
+  if(!email||!password){showAuthMessage('Informe e-mail e senha.',true);return;}
+  showAuthMessage('Entrando…');
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email,password});
+  if(error){showAuthMessage(error.message,true);return;}
+  await applySession(data.session);
+}
+async function signUpUser(){
+  if(!supabaseClient)return;
+  const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;
+  if(!email||password.length<8){showAuthMessage('Informe um e-mail válido e uma senha com pelo menos 8 caracteres.',true);return;}
+  showAuthMessage('Criando a conta…');
+  const returnUrl=location.href.split(/[?#]/)[0];
+  const {data,error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:returnUrl}});
+  if(error){showAuthMessage(error.message,true);return;}
+  if(data.session)await applySession(data.session);
+  else showAuthMessage('Conta criada. Confirme o e-mail recebido e depois clique em Entrar.');
+}
+async function signOutUser(){
+  if(!supabaseClient)return;
+  const dirty=current.samples.some(s=>s.photo||Object.keys(s.data||{}).length);
+  if(dirty&&!confirm('Sair e descartar a corrida que está em edição?'))return;
+  await supabaseClient.auth.signOut();
+}
+async function loadCloudData(){
+  if(!supabaseClient||!authUser)return;
+  setCloudLoading(true);setSyncPill('sincronizando');
+  try{
+    const [elementsResult,runsResult]=await Promise.all([
+      supabaseClient.from('elements').select('symbol,display_order').order('display_order'),
+      supabaseClient.from('runs').select('id,code,run_date,shift,created_at,samples(id,sample_order,chemical_data,photo_path,photo_name,ocr_confidence)').order('run_date',{ascending:false}).order('created_at',{ascending:false})
+    ]);
+    if(elementsResult.error)throw elementsResult.error;if(runsResult.error)throw runsResult.error;
+    const serverElements=(elementsResult.data||[]).map(row=>row.symbol).filter(Boolean);
+    INP=serverElements.length?serverElements:[...REPORT_ORDER];
+    archive=await Promise.all((runsResult.data||[]).map(async run=>{
+      const samples=await Promise.all((run.samples||[]).sort((a,b)=>a.sample_order-b.sample_order).map(async sample=>{
+        let photo=null;
+        if(sample.photo_path){
+          const signed=await supabaseClient.storage.from('lab-reports').createSignedUrl(sample.photo_path,43200);
+          if(!signed.error)photo=signed.data?.signedUrl||null;
+        }
+        const chemical={};INP.forEach(el=>chemical[el]=Number(sample.chemical_data?.[el]??0));
+        return {id:sample.id,photo,photoPath:sample.photo_path,photoName:sample.photo_name,data:chemical,ocr:{state:'done',found:Object.keys(sample.chemical_data||{}).length,confidence:Number(sample.ocr_confidence||0)}};
+      }));
+      return {id:run.id,code:run.code,date:run.run_date,turno:run.shift,samples};
+    }));
+    if(viewId&&!archive.some(run=>run.id===viewId))viewId=null;
+    uS();const tab=at();if(tab==='fotos')renderFotos();else{dc();rT(tab);}
+    setSyncPill('sincronizado');
+  }catch(err){console.error(err);setSyncPill('falha ao sincronizar',true);alert('Não foi possível carregar o histórico: '+(err.message||err));}
+  finally{setCloudLoading(false);}
+}
+async function syncElementsToCloud(elements){
+  if(!elements.length)return;
+  if(!supabaseClient||!authUser)throw new Error('Entre na sua conta antes de cadastrar novos elementos.');
+  for(const symbol of elements){
+    const {error}=await supabaseClient.rpc('register_element',{p_symbol:symbol,p_display_order:(INP.indexOf(symbol)+1)*10});
+    if(error)throw error;
+  }
+}
+
+function go(t){
+  document.querySelectorAll('.pnl').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('p-'+t).classList.add('on');
+  document.querySelector(`[data-t="${t}"]`).classList.add('on');
+  if(t==='fotos')renderFotos();else{dc();rT(t);}
+}
+function at(){return document.querySelector('.tb.on').dataset.t}
+function sw(v){viewId=v==='__draft__'?null:v;const t=at();if(t==='fotos')renderFotos();else{dc();rT(t);}}
+
+function getActive(){
+  if(viewId){const a=archive.find(r=>r.id===viewId);return a||archive[0]||null;}
+  return current;
+}
+
+let CH=[];function dc(){CH.forEach(c=>c.destroy());CH=[];}
+function lb(n){return Array.from({length:n},(_,i)=>(i+1)+'ª')}
+function fv(v){return v>=.01?v.toFixed(4):v.toFixed(5)}
+
+function uS(){
+  const sel=document.getElementById('sel');
+  let opts='<option value="__draft__">📝 Corrida em edição</option>';
+  archive.forEach(r=>{opts+=`<option value="${r.id}"${viewId===r.id?' selected':''}>${esc(r.code)} (${esc(r.date)})</option>`;});
+  sel.innerHTML=opts;
+  if(!viewId)sel.value='__draft__';
+  document.getElementById('histCount').textContent=archive.length+' arquivadas';
+}
+
+// === FOTOS ===
+function renderFotos(){
+  document.getElementById('runDate').value=current.date;
+  document.getElementById('runCode').value=current.code;
+  document.getElementById('runTurno').value=current.turno;
+  const g=document.getElementById('sGrid');g.innerHTML='';
+  current.samples.forEach((s,i)=>{
+    const has=s.data&&s.data['Base (Cu)']>0;
+    const o=s.ocr||{state:'idle',message:s.photo?'Foto pronta para leitura':'Envie uma foto para leitura automática',progress:0,found:0};
+    const busy=['queued','loading','recognizing'].includes(o.state);
+    const panelClass=o.state==='done'?'ok':o.state==='error'?'err':'';
+    const autoFields=s.autoFields||[];
+    g.innerHTML+=`<div class="sample-card${has?' active':''}">
+      <div class="sample-card-head"><span class="num">${i+1}ª</span><span class="status ${has?'status-ok':'status-empty'}">${has?'✓':'—'}</span><button class="btn-del" onclick="delS(${i})">×</button></div>
+      <div class="sample-photo">${s.photo?`<img src="${s.photo}">`:`<div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><p>Foto do laudo</p></div>`}<input type="file" accept="image/*" onchange="lP(${i},event)"></div>
+      <div class="ocr-panel ${panelClass}">
+        <div class="ocr-line"><strong id="ocrStatus-${i}">${o.message}</strong><span class="ocr-found" id="ocrFound-${i}">${o.found||0}/${INP.length}</span></div>
+        <div class="ocr-progress"><span id="ocrProgress-${i}" style="width:${o.progress||0}%"></span></div>
+        <div class="ocr-actions">
+          <button type="button" onclick="rerunOcr(${i},event)" ${!s.photo||busy?'disabled':''}>${busy?'Lendo…':'Ler novamente'}</button>
+          <button type="button" onclick="openDraftPhotos(${i},event)" ${!s.photo?'disabled':''}>Ampliar laudo</button>
+        </div>
+      </div>
+      <div class="sample-data">${INP.map(el=>{const hasValue=!!s.data&&Object.prototype.hasOwnProperty.call(s.data,el),value=hasValue?s.data[el]:null;const classes=[hasValue?'filled':'',autoFields.includes(el)?'auto':''].filter(Boolean).join(' ');return`<div class="sdr"><label>${el.replace('Base (Cu)','Cu%')}</label><input value="${hasValue?formatElementValue(value):''}" class="${classes}" data-s="${i}" data-e="${el}" onchange="uV(${i},'${el}',this.value)"></div>`}).join('')}</div>
+    </div>`;
+  });
+  // Archive list
+  document.getElementById('arcCount').textContent=archive.length;
+  const al=document.getElementById('arcList');al.innerHTML='';
+  archive.slice().reverse().forEach(r=>{
+    const cu=r.samples[r.samples.length-1]?.data?.['Base (Cu)']||0;
+    const photos=r.samples.filter(s=>s.photo);
+    const firstPhoto=photos[0]?.photo;
+    al.innerHTML+=`<div class="arc-card${viewId===r.id?' sel':''}" onclick="sw('${r.id}');uS();">
+      <div class="arc-top"><div class="arc-main"><div class="arc-code">${esc(r.code)}</div>
+      <div class="arc-meta">${esc(r.date)} • ${esc(r.turno)} • ${r.samples.length} amostras</div>
+      <div class="arc-cu">Cu: ${cu.toFixed(4)}%</div></div>
+      ${firstPhoto?`<img class="arc-thumb" src="${firstPhoto}" alt="Miniatura do laudo" onclick="openRunPhotos('${r.id}',event)">`:''}</div>
+      <div class="arc-actions">
+        ${photos.length?`<button class="arc-attach" type="button" onclick="openRunPhotos('${r.id}',event)">📎 ${photos.length} laudo${photos.length>1?'s':''} anexado${photos.length>1?'s':''}</button>`:'<span class="arc-meta">Sem foto anexada</span>'}
+        <button class="arc-delete" type="button" onclick="deleteRun('${r.id}',event)">🗑 Excluir</button>
+      </div>
+    </div>`;
+  });
+}
+
+async function deleteRun(id,e){
+  if(e)e.stopPropagation();
+  const run=archive.find(r=>r.id===id);if(!run)return;
+  if(!confirm(`Excluir definitivamente a corrida "${run.code}" e seus laudos anexados?`))return;
+  if(!supabaseClient||!authUser){alert('Entre na sua conta para excluir corridas.');return;}
+  setCloudLoading(true,'Excluindo corrida e laudos…');setSyncPill('excluindo');
+  try{
+    const paths=(run.samples||[]).map(s=>s.photoPath).filter(Boolean);
+    const {error}=await supabaseClient.from('runs').delete().eq('id',id);if(error)throw error;
+    let storageWarning=false;
+    if(paths.length){const removed=await supabaseClient.storage.from('lab-reports').remove(paths);storageWarning=!!removed.error;if(removed.error)console.error(removed.error);}
+    if(viewId===id)viewId=null;
+    await loadCloudData();
+    alert(storageWarning?'Corrida excluída. Um anexo não pôde ser limpo do armazenamento; o registro não está mais acessível.':'Corrida e laudos excluídos.');
+  }catch(err){console.error(err);setSyncPill('erro ao excluir',true);alert('Não foi possível excluir a corrida: '+(err.message||err));}
+  finally{setCloudLoading(false);}
+}
+
+function formatElementValue(v){return v>=1?v.toFixed(4):v>=.001?v.toFixed(4):v.toFixed(5)}
+function parseChemicalValue(v){const n=parseFloat(String(v).trim().replace('%','').replace(',','.').replace(/^[<>≤≥]\s*/,''));return Number.isFinite(n)?n:0}
+function uV(i,el,v){
+  if(!current.samples[i].data)current.samples[i].data={};
+  current.samples[i].data[el]=parseChemicalValue(v);
+  current.samples[i].autoFields=(current.samples[i].autoFields||[]).filter(x=>x!==el);
+}
+function addSample(){current.samples.push({photo:null,data:{}});renderFotos();}
+function delS(i){if(current.samples.length<=1)return;current.samples.splice(i,1);renderFotos();}
+
+function readFileDataUrl(file){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(file);})}
+function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Não foi possível abrir a imagem.'));img.src=src;})}
+async function compressPhoto(file){
+  const original=await readFileDataUrl(file);
+  const img=await loadImage(original);
+  const maxSide=1800,scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement('canvas');canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);
+  canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+  return canvas.toDataURL('image/jpeg',.82);
+}
+
+async function lP(i,e){
+  const file=e.target.files[0];if(!file)return;
+  const sample=current.samples[i];
+  sample.ocr={state:'loading',message:'Preparando a foto…',progress:3,found:0};
+  renderFotos();
+  try{
+    sample.photo=await compressPhoto(file);
+    sample.photoName=file.name;
+    sample.ocr={state:'queued',message:'Leitura aguardando…',progress:5,found:0};
+    renderFotos();
+    queueOcr(i);
+  }catch(err){
+    sample.ocr={state:'error',message:err.message||'Falha ao abrir a foto',progress:0,found:0};
+    renderFotos();
+  }
+}
+
+let ocrWorker=null,ocrQueue=Promise.resolve(),activeOcrSample=-1;
+function queueOcr(i){ocrQueue=ocrQueue.then(()=>runSampleOcr(i)).catch(err=>console.error(err));return ocrQueue}
+function rerunOcr(i,e){if(e)e.stopPropagation();const s=current.samples[i];if(!s||!s.photo)return;s.ocr={state:'queued',message:'Leitura aguardando…',progress:5,found:0};renderFotos();queueOcr(i)}
+
+function setOcrUi(i,message,progress){
+  const s=current.samples[i];if(!s)return;
+  s.ocr={...(s.ocr||{}),message,progress};
+  const st=document.getElementById('ocrStatus-'+i),bar=document.getElementById('ocrProgress-'+i);
+  if(st)st.textContent=message;if(bar)bar.style.width=progress+'%';
+}
+
+async function getOcrWorker(){
+  if(ocrWorker)return ocrWorker;
+  if(!window.Tesseract)throw new Error('O leitor OCR não carregou. Verifique a conexão com a internet.');
+  ocrWorker=await Tesseract.createWorker('eng',1,{logger:m=>{
+    if(activeOcrSample<0)return;
+    const pct=Math.round((m.progress||0)*100);
+    if(m.status==='recognizing text')setOcrUi(activeOcrSample,`Lendo os elementos… ${pct}%`,30+Math.round(pct*.68));
+    else setOcrUi(activeOcrSample,'Carregando o leitor OCR…',Math.max(8,Math.round(pct*.28)));
+  }});
+  await ocrWorker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1',user_defined_dpi:'300'});
+  return ocrWorker;
+}
+
+async function prepareOcrImage(src){
+  const img=await loadImage(src);
+  const sx=Math.round(img.naturalWidth*.035),sy=Math.round(img.naturalHeight*.255);
+  const sw=Math.round(img.naturalWidth*.75),sh=Math.round(img.naturalHeight*.57);
+  const scale=Math.max(1.8,Math.min(3,1800/sw));
+  const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});
+  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-128)*1.65+150));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareNumberColumn(src){
+  const img=await loadImage(src);
+  const sx=Math.round(img.naturalWidth*.425),sy=Math.round(img.naturalHeight*.312);
+  const sw=Math.round(img.naturalWidth*.17),sh=Math.round(img.naturalHeight*.50),scale=5;
+  const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-135)*2+160));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareLabelColumn(src){
+  const img=await loadImage(src);
+  const sx=Math.round(img.naturalWidth*.055),sy=Math.round(img.naturalHeight*.312);
+  const sw=Math.round(img.naturalWidth*.205),sh=Math.round(img.naturalHeight*.50),scale=5;
+  const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-135)*2+160));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareHeaderImage(src){
+  const img=await loadImage(src);
+  const sx=Math.round(img.naturalWidth*.20),sy=Math.round(img.naturalHeight*.255);
+  const sw=Math.round(img.naturalWidth*.58),sh=Math.round(img.naturalHeight*.075),scale=4;
+  const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-132)*1.9+158));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareTimestampImage(src){
+  const img=await loadImage(src);
+  const sx=Math.round(img.naturalWidth*.55),sy=Math.round(img.naturalHeight*.385);
+  const sw=Math.round(img.naturalWidth*.31),sh=Math.round(img.naturalHeight*.07),scale=5;
+  const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-130)*2+162));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+const LABEL_PATTERNS=[
+  ['Base (Cu)',/^Base\s*\(?\s*C(?:u|v)\s*\)?\b/i],['Cu+Ag',/^Cu\s*(?:\+|t)\s*A[gq]\b/i],
+  ['Pb',/^P[b8]\b/i],['Ni',/^N[i1]\b/i],['Sn',/^(?:Sn|5n)\b/i],['Ag',/^A[gq]\b/i],['Zn',/^Z[nm]\b/i],['Fe',/^F[e¢]\b/i],['Sb',/^(?:Sb|5b)\b/i],
+  ['Te',/^Te\b/i],['As',/^As\b/i],['Se',/^Se\b/i],['Ti',/^Ti\b/i],['Hg',/^H[gq]\b/i],['Cr',/^Cr\b/i],['Si',/^S[i1]\b/i],['Al',/^A[l1]\b/i],['Bi',/^B[i1]\b/i],['Co',/^Co\b/i],['Mn',/^M[nm]\b/i],['Cd',/^Cd\b/i],['Mg',/^M[gq]\b/i],['Zr',/^Zr\b/i],
+  ['P',/^P\b/i],['S',/^S\b/i],['B',/^B\b/i]
+];
+function labelFromLine(line){
+  const clean=line.replace(/^[\s|:;!\[\]()]+/,'');const hit=LABEL_PATTERNS.find(([,re])=>re.test(clean));return hit?hit[0]:null;
+}
+function numericTokens(text){
+  const clean=text.replace(/[Oo](?=\s*[.,]\s*\d)/g,'0').replace(/\b(99|0)\s+(\d{3,6})\b/g,'$1.$2');
+  return [...clean.matchAll(/(?<!\d)(?:99|0)[.,]\s*\d{3,6}(?!\d)/g)].map(m=>parseFloat(m[0].replace(/\s/g,'').replace(',','.'))).filter(Number.isFinite);
+}
+function mergeReportSequence(found,all){
+  let seq=null;
+  for(let start=0;start+REPORT_ORDER.length<=all.length;start++)if(all[start]>90&&all[start+REPORT_ORDER.length-1]>90){seq=all.slice(start,start+REPORT_ORDER.length);break;}
+  if(seq)REPORT_ORDER.forEach((el,i)=>{found[el]=seq[i]});
+  return found;
+}
+function parseLabelColumn(text){
+  return text.split(/\r?\n/).map(line=>{
+    const clean=line.trim();
+    if(/^Base\s*\(?\s*Cu\s*\)?/i.test(clean))return'Base (Cu)';
+    if(/^Cu\s*\+\s*Ag/i.test(clean))return'Cu+Ag';
+    const token=clean.match(/^([A-Za-z]{1,2})\b/);return token?normalizeElementName(token[1]):null;
+  }).filter(Boolean);
+}
+function mapLabelsToValues(labels,values){
+  const core=REPORT_ORDER.slice(0,-1);
+  if(values.length!==labels.length+1||labels.length<core.length||labels[0]!=='Base (Cu)'||values[0]<90||values[values.length-1]<90)return{};
+  let expected=0;for(const label of labels)if(label===core[expected])expected++;
+  if(expected!==core.length)return{};
+  const mapped=Object.fromEntries(labels.map((el,i)=>[el,values[i]]));mapped['Cu+Ag']=values[values.length-1];return mapped;
+}
+function turnoFromHour(hour){
+  if(!Number.isFinite(hour))return null;
+  if(hour>=6&&hour<14)return'A (06-14h)';
+  if(hour>=14&&hour<22)return'B (14-22h)';
+  return'C (22-06h)';
+}
+function parseHeaderMeta(text){
+  const clean=String(text||'').replace(/\s+/g,' '),compact=clean.replace(/\s/g,''),meta={};
+  const stuck=compact.match(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{2})([01]\d|2[0-3])[:.](\d{2})/);
+  if(stuck){meta.date=`20${stuck[3]}-${stuck[2]}-${stuck[1]}`;meta.time=`${stuck[4]}:${stuck[5]}`;meta.turno=turnoFromHour(parseInt(stuck[4],10));}
+  if(!meta.date){const date=clean.match(/\b(\d{2})[\/.\-](\d{2})[\/.\-](20\d{2}|\d{2})(?!\d)/);if(date){const year=date[3].length===2?'20'+date[3]:date[3];meta.date=`${year}-${date[2]}-${date[1]}`;}}
+  if(!meta.time){const time=clean.match(/\b([01]\d|2[0-3])[:.](\d{2})(?:[:.](\d{2}))?\b/);if(time){meta.time=`${time[1]}:${time[2]}${time[3]?':'+time[3]:''}`;meta.turno=turnoFromHour(parseInt(time[1],10));}}
+  const code=clean.match(/\b(20\d{6})[.,](\d{4})[.,](\d)[.,](\d)[.,](\d)\b/);
+  if(code)meta.code=`${code[1]}.${code[2]}.${code[3]}.${code[4]}.${code[5]}`;
+  return meta;
+}
+function applyHeaderMeta(meta){
+  if(meta.date)current.date=meta.date;if(meta.code)current.code=meta.code;if(meta.turno)current.turno=meta.turno;
+}
+function parseLaudoText(text){
+  const found={};let pending=null,pendingAge=0;
+  text.split(/\r?\n/).forEach(raw=>{
+    const line=raw.trim();if(!line)return;
+    const label=labelFromLine(line),nums=numericTokens(line);
+    if(label){if(nums.length)found[label]=nums[nums.length-1];else{pending=label;pendingAge=0;}}
+    else if(pending&&nums.length){found[pending]=nums[0];pending=null;}
+    if(pending&&++pendingAge>2)pending=null;
+  });
+  mergeReportSequence(found,numericTokens(text));
+  return found;
+}
+
+async function runSampleOcr(i){
+  const sample=current.samples[i];if(!sample||!sample.photo)return;
+  let rawText='',newlyAdded=[];
+  activeOcrSample=i;sample.ocr={state:'loading',message:'Preparando a leitura…',progress:8,found:0};renderFotos();
+  try{
+    const worker=await getOcrWorker();sample.ocr.state='recognizing';setOcrUi(i,'Lendo a coluna de valores…',30);
+    const numberImage=await prepareNumberColumn(sample.photo);
+    await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
+    const numberResult=await worker.recognize(numberImage),numberText=numberResult.data.text||'',numberValues=numericTokens(numberText);
+
+    setOcrUi(i,'Verificando a lista de elementos…',64);
+    const labelImage=await prepareLabelColumn(sample.photo);
+    await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()+',preserve_interword_spaces:'1'});
+    const labelResult=await worker.recognize(labelImage),labelText=labelResult.data.text||'';
+    const labelMap=mapLabelsToValues(parseLabelColumn(labelText),numberValues);
+    newlyAdded=registerElements(Object.keys(labelMap));
+    await syncElementsToCloud(newlyAdded);
+    const merged={...mergeReportSequence({},numberValues),...labelMap};
+
+    setOcrUi(i,'Lendo data, turno e código…',82);
+    const headerImage=await prepareHeaderImage(sample.photo);
+    await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789/.:,-',preserve_interword_spaces:'1'});
+    const headerResult=await worker.recognize(headerImage),headerText=headerResult.data.text||'';
+    const timestampImage=await prepareTimestampImage(sample.photo),timestampResult=await worker.recognize(timestampImage),timestampText=timestampResult.data.text||'';
+    await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+    const meta=parseHeaderMeta(`${headerText}\n${timestampText}`);applyHeaderMeta(meta);sample.meta=meta;
+
+    const values=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]])),fields=Object.keys(values);
+    rawText=`--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
+    if(fields.length<2)throw new Error(`Leitura insuficiente (${fields.length}/${INP.length}). Tente uma foto mais reta e nítida.`);
+    sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
+    const complete=fields.length===INP.length;
+    const headerOk=meta.date&&meta.code&&meta.turno;
+    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(numberResult.data.confidence||0),text:rawText};
+  }catch(err){sample.ocr={state:'error',message:err.message||'Não foi possível ler o laudo.',progress:0,found:0,text:rawText};}
+  finally{activeOcrSample=-1;renderFotos();}
+  if(newlyAdded.length)alert(`⚠ Novo${newlyAdded.length>1?'s elementos detectados':' elemento detectado'}: ${newlyAdded.join(', ')}.\n\n${newlyAdded.length>1?'Os campos foram incluídos':'O campo foi incluído'} em todo o sistema. As análises anteriores receberam valor zero.`);
+}
+
+let modalPhotos=[],modalPhotoIndex=0,modalTitle='Laudo anexado';
+function openDraftPhotos(sampleIndex,e){
+  if(e)e.stopPropagation();modalPhotos=current.samples.map((s,i)=>s.photo?{src:s.photo,label:`${i+1}ª amostra`}:null).filter(Boolean);
+  const target=current.samples[sampleIndex]?.photo;modalPhotoIndex=Math.max(0,modalPhotos.findIndex(p=>p.src===target));modalTitle='Corrida em edição';showPhotoModal();
+}
+function openRunPhotos(id,e){
+  if(e)e.stopPropagation();const run=archive.find(r=>r.id===id);if(!run)return;
+  modalPhotos=run.samples.map((s,i)=>s.photo?{src:s.photo,label:`${i+1}ª amostra`}:null).filter(Boolean);modalPhotoIndex=0;modalTitle=`Corrida ${run.code}`;showPhotoModal();
+}
+function showPhotoModal(){
+  if(!modalPhotos.length)return;const p=modalPhotos[modalPhotoIndex];
+  document.getElementById('photoTitle').textContent=modalTitle;document.getElementById('photoSubtitle').textContent=p.label;
+  document.getElementById('photoFull').src=p.src;document.getElementById('photoCounter').textContent=`${modalPhotoIndex+1} / ${modalPhotos.length}`;
+  document.getElementById('photoPrev').disabled=modalPhotoIndex===0;document.getElementById('photoNext').disabled=modalPhotoIndex===modalPhotos.length-1;
+  document.getElementById('photoModal').classList.add('on');
+}
+function movePhoto(dir){modalPhotoIndex=Math.max(0,Math.min(modalPhotos.length-1,modalPhotoIndex+dir));showPhotoModal()}
+function closePhotoModal(){document.getElementById('photoModal').classList.remove('on');document.getElementById('photoFull').removeAttribute('src')}
+document.addEventListener('keydown',e=>{if(!document.getElementById('photoModal').classList.contains('on'))return;if(e.key==='Escape')closePhotoModal();if(e.key==='ArrowLeft')movePhoto(-1);if(e.key==='ArrowRight')movePhoto(1)});
+
+async function dataUrlToBlob(dataUrl){const response=await fetch(dataUrl);if(!response.ok)throw new Error('Falha ao preparar o laudo para envio.');return response.blob()}
+function uniqueFileId(){return crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2)}`}
+
+async function saveAndClear(){
+  const code=document.getElementById('runCode').value;
+  const date=document.getElementById('runDate').value;
+  const turno=document.getElementById('runTurno').value;
+  if(!code){alert('Preencha o código da corrida!');return;}
+  const hasSamples=current.samples.some(s=>s.data&&s.data['Base (Cu)']>0);
+  if(!hasSamples){alert('Preencha ao menos uma amostra com valor de Cu!');return;}
+  if(!date){alert('Preencha a data da corrida!');return;}
+  if(!supabaseClient||!authUser){alert('Entre na sua conta para salvar a corrida.');return;}
+
+  setCloudLoading(true,'Salvando corrida e laudos…');setSyncPill('enviando');
+  let runId=null;const uploadedPaths=[];
+  try{
+    const created=await supabaseClient.from('runs').insert({code,run_date:date,shift:turno,created_by:authUser.id}).select('id').single();
+    if(created.error)throw created.error;runId=created.data.id;
+    const sampleRows=[];
+    for(let i=0;i<current.samples.length;i++){
+      const sample=current.samples[i];let photoPath=null;
+      if(sample.photo){
+        const blob=await dataUrlToBlob(sample.photo);
+        photoPath=`${runId}/${String(i+1).padStart(2,'0')}-${uniqueFileId()}.jpg`;
+        const upload=await supabaseClient.storage.from('lab-reports').upload(photoPath,blob,{contentType:'image/jpeg',upsert:false});
+        if(upload.error)throw upload.error;uploadedPaths.push(photoPath);
+      }
+      const chemicalData={};INP.forEach(el=>chemicalData[el]=Number(sample.data?.[el]??0));
+      sampleRows.push({run_id:runId,sample_order:i+1,chemical_data:chemicalData,photo_path:photoPath,photo_name:sample.photoName||null,ocr_confidence:Number(sample.ocr?.confidence||0),created_by:authUser.id});
+    }
+    const inserted=await supabaseClient.from('samples').insert(sampleRows);if(inserted.error)throw inserted.error;
+  }catch(err){
+    console.error(err);
+    if(uploadedPaths.length)await supabaseClient.storage.from('lab-reports').remove(uploadedPaths);
+    if(runId)await supabaseClient.from('runs').delete().eq('id',runId);
+    setSyncPill('erro ao salvar',true);setCloudLoading(false);
+    alert('Não foi possível salvar a corrida: '+(err.message||err));return;
+  }
+
+  viewId=runId;
+  current={date:new Date().toISOString().split('T')[0],code:'',turno:'A (06-14h)',samples:[{photo:null,data:{}}]};
+  await loadCloudData();setCloudLoading(false);
+  alert('✅ Corrida salva no histórico compartilhado. Os campos estão prontos para uma nova entrada.');
+}
+
+// === BUILD ===
+function bd(r){if(!r||!r.samples)return null;const d={};INP.forEach(el=>{d[el]=r.samples.map(s=>s.data&&s.data[el]?s.data[el]:0)});return{...r,n:r.samples.length,d};}
+
+function rT(t){const r=getActive();const b=bd(r);if(!b||!b.d['Base (Cu)']||b.n<1)return;({planilha:rP,reducoes:rR,graficos:rG,dashboard:rD})[t](b);}
+
+function rP(r){
+  const{n,d}=r,L=lb(n),cu=d['Base (Cu)'];
+  document.getElementById('mP').innerHTML=`
+    <div class="mc"><div class="lb">Cu Inicial</div><div class="vl">${cu[0].toFixed(3)}%</div><div class="sb sn">1ª</div></div>
+    <div class="mc"><div class="lb">Cu Máx</div><div class="vl">${Math.max(...cu).toFixed(3)}%</div><div class="sb su">Pico</div></div>
+    <div class="mc"><div class="lb">Cu Final</div><div class="vl">${cu[n-1].toFixed(3)}%</div><div class="sb su">↑${(cu[n-1]-cu[0]).toFixed(3)}pp</div></div>
+    <div class="mc"><div class="lb">Amostras</div><div class="vl">${n}</div><div class="sb sn">${r.code}</div></div>`;
+  let th='<th>Elem</th>';L.forEach(l=>th+=`<th>${l}</th>`);document.getElementById('thP').innerHTML=th;
+  const tb=document.getElementById('tbP');tb.innerHTML='';
+  INP.forEach(el=>{const v=d[el];if(!v)return;const mx=Math.max(...v),mn=Math.min(...v.filter(x=>x>0));let row=`<td>${el}</td>`;v.forEach(x=>{let c='';if(el!=='Base (Cu)'&&el!=='Cu+Ag'&&el!=='Ag'){if(x===mx&&mx>5e-5)c='vh';if(x>0&&x===mn&&mx!==mn)c='vl2';}else{if(x===mx&&x>0)c='vl2';if(x>0&&x===mn)c='vh';}row+=`<td class="${c}">${x>0?fv(x):'-'}</td>`;});tb.innerHTML+=`<tr>${row}</tr>`;});
+}
+
+function rR(r){
+  const{n,d}=r;
+  let th='<th>Elem</th>';for(let i=1;i<n;i++)th+=`<th>${i}ª→${i+1}ª</th>`;th+='<th>Total</th>';
+  document.getElementById('thR').innerHTML=th;
+  const tb=document.getElementById('tbR');tb.innerHTML='';const rd={};
+  impurityElements().forEach(el=>{const v=d[el];if(!v||!v[0])return;let row=`<td>${el}</td>`;for(let i=1;i<n;i++){const p=v[i-1],c=v[i];let pc=p===0?'0.0':((c-p)/p*100).toFixed(1);row+=`<td class="${parseFloat(pc)<=0?'vp':'vn'}">${parseFloat(pc)>0?'+':''}${pc}%</td>`;}const f=v[0],l=v[n-1],tot=f===0?'N/A':((l-f)/f*100).toFixed(1);row+=`<td class="${parseFloat(tot)<=0?'vp':'vn'}" style="font-weight:700">${parseFloat(tot)>0?'+':''}${tot}%</td>`;tb.innerHTML+=`<tr>${row}</tr>`;rd[el]=f===0?0:Math.max(0,(f-l)/f*100);});
+  const so=Object.entries(rd).sort((a,b)=>b[1]-a[1]);if(!so.length)return;
+  const c=new Chart(document.getElementById('cRB'),{type:'bar',data:{labels:so.map(e=>e[0]),datasets:[{data:so.map(e=>e[1]),backgroundColor:so.map(([_,v])=>v>=90?'oklch(50% .14 145)':v>=50?'oklch(50% .1 190)':'oklch(58% .14 70)'),borderRadius:3,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{max:100,ticks:{callback:v=>v+'%',font:{size:8}}},y:{ticks:{font:{size:8,weight:'600'}}}}}});CH.push(c);
+}
+
+function rG(r){
+  const{n,d}=r,L=lb(n);
+  function ln(id,vl,lim,col){if(!vl||vl.every(v=>v===0))return;const ds=[{data:vl,borderColor:col,backgroundColor:'transparent',borderWidth:2,pointRadius:2.5,pointBackgroundColor:col,tension:.3,fill:false}];if(lim!==undefined)ds.push({data:Array(n).fill(lim),borderColor:'oklch(52% .16 25)',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false});const c=new Chart(document.getElementById(id),{type:'line',data:{labels:L,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:7}}},y:{ticks:{font:{size:7,family:'JetBrains Mono'}}}}}});CH.push(c);}
+  ln('cCu',d['Base (Cu)'],undefined,'oklch(50% .14 145)');
+  ln('cPb',d.Pb,.055,'oklch(52% .16 25)');
+  ln('cSn',d.Sn,.005,'oklch(58% .14 70)');
+  ln('cFe',d.Fe,.002,'oklch(50% .12 250)');
+  ln('cZn',d.Zn,.005,'oklch(50% .1 190)');
+  ln('cNi',d.Ni,.01,'oklch(50% .14 300)');
+  ln('cSb',d.Sb,.0005,'oklch(50% .14 145)');
+  const dynamicSets=impurityElements().map((el,i)=>d[el]&&d[el].some(v=>v>0)?{label:el,data:d[el],borderColor:`hsl(${i*47%360} 62% 44%)`,borderWidth:1.25,pointRadius:2,tension:.25,fill:false}:null).filter(Boolean);
+  if(dynamicSets.length){const c=new Chart(document.getElementById('cDyn'),{type:'line',data:{labels:L,datasets:dynamicSets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top',labels:{usePointStyle:true,boxWidth:6,font:{size:7}}}},scales:{x:{grid:{display:false},ticks:{font:{size:7}}},y:{type:'logarithmic',ticks:{font:{size:7,family:'JetBrains Mono'}}}}}});CH.push(c);}
+}
+
+function rD(r){
+  const{n,d}=r,L=lb(n),cu=d['Base (Cu)'];
+  const fR=d.Fe&&d.Fe[0]?((d.Fe[0]-d.Fe[n-1])/d.Fe[0]*100):0;
+  const aR=d.Al&&d.Al[0]?((d.Al[0]-d.Al[n-1])/d.Al[0]*100):0;
+  const sR2=d.Sn&&d.Sn[0]?((d.Sn[0]-d.Sn[n-1])/d.Sn[0]*100):0;
+  document.getElementById('mD').innerHTML=`
+    <div class="mc"><div class="lb">Cu Final</div><div class="vl" style="color:var(--sc)">${cu[n-1].toFixed(3)}%</div><div class="sb su">${cu[n-1]>=99.9?'≥99.9%':'<99.9%'}</div></div>
+    <div class="mc"><div class="lb">Red. Fe</div><div class="vl" style="color:var(--ac)">${fR.toFixed(1)}%</div><div class="sb su">${d.Fe?d.Fe[0].toFixed(4)+'→'+d.Fe[n-1].toFixed(4):''}</div></div>
+    <div class="mc"><div class="lb">Red. Al</div><div class="vl" style="color:var(--ac)">${aR.toFixed(1)}%</div><div class="sb su">${d.Al?d.Al[0].toFixed(3)+'→'+d.Al[n-1].toFixed(5):''}</div></div>
+    <div class="mc"><div class="lb">Red. Sn</div><div class="vl" style="color:var(--ac)">${sR2.toFixed(1)}%</div><div class="sb su">${d.Sn?d.Sn[0].toFixed(4)+'→'+d.Sn[n-1].toFixed(4):''}</div></div>`;
+
+  // Log chart
+  const dE=impurityElements();
+  const ds=dE.map((el,i)=>{const col=`hsl(${i*47%360} 62% 44%)`;return d[el]&&d[el].some(v=>v>0)?{label:el,data:d[el],borderColor:col,borderWidth:1.25,pointRadius:2,pointBackgroundColor:col,tension:.3,fill:false}:null}).filter(Boolean);
+  if(ds.length>0){const c1=new Chart(document.getElementById('cAll'),{type:'line',data:{labels:L,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{position:'top',labels:{usePointStyle:true,font:{size:8}}}},scales:{x:{grid:{display:false},ticks:{font:{size:7}}},y:{type:'logarithmic',ticks:{font:{size:7,family:'JetBrains Mono'},callback:v=>v>=.01?v.toFixed(2)+'%':v.toFixed(4)+'%'}}}}});CH.push(c1);}
+
+  // === VILÕES (limites atualizados) ===
+  const vilaoEl=impurityElements();
+  const viloes=vilaoEl.map(el=>{
+    const vFinal=d[el]?d[el][n-1]:0;
+    const lim=LM[el]||.0005;
+    const ratio=lim>0?vFinal/lim:0;
+    return{el,vFinal,lim,ratio};
+  }).filter(v=>v.vFinal>0).sort((a,b)=>b.ratio-a.ratio);
+
+  const vL=document.getElementById('vilaoList');vL.innerHTML='';
+  viloes.slice(0,6).forEach((v,i)=>{
+    const pct=Math.min(v.ratio*50,100);
+    const barColor=v.ratio>1?'oklch(52% .16 25)':v.ratio>.6?'oklch(58% .14 70)':'oklch(50% .14 145)';
+    vL.innerHTML+=`<div class="vilao-item">
+      <span class="vilao-rank r${Math.min(i+1,3)}">#${i+1}</span>
+      <div style="flex:1"><div class="vilao-el">${v.el}</div><div class="vilao-bar"><div class="vilao-bar-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
+      <div class="vilao-vals"><span class="vilao-final">${v.vFinal.toFixed(4)}%</span><span class="vilao-limit">lim: ${v.lim}</span></div>
+    </div>`;
+  });
+
+  // === MAIORES REDUÇÕES (pico → mínimo entre todas amostras) ===
+  const redEl=impurityElements();
+  const reds=redEl.map(el=>{
+    const v=d[el];if(!v)return null;
+    const positives=v.filter(x=>x>0);
+    if(positives.length<2)return null;
+    const peak=Math.max(...v);
+    const valley=Math.min(...positives);
+    if(peak===0)return null;
+    const pct=((peak-valley)/peak*100);
+    return{el,peak,valley,pct};
+  }).filter(Boolean).sort((a,b)=>b.pct-a.pct);
+
+  const rL=document.getElementById('redList');rL.innerHTML='';
+  reds.slice(0,6).forEach(r=>{
+    rL.innerHTML+=`<div class="red-item">
+      <span class="red-el">${r.el}</span>
+      <span class="red-vals">${r.peak.toFixed(4)} → ${r.valley.toFixed(5)}</span>
+      <span class="red-pct">-${r.pct.toFixed(1)}%</span>
+    </div>`;
+  });
+
+  // === COMPARATIVO ===
+  const cDiv=document.getElementById('compDiv');
+  const compEls=INP;
+  let compH='<div class="comp-hdr"><span>Elem</span><span style="text-align:right">1ª Am.</span><span></span><span style="text-align:right">Última</span></div>';
+  compEls.forEach(el=>{
+    const v1=d[el]?d[el][0]:0;const vL2=d[el]?d[el][n-1]:0;
+    const isCu=el==='Base (Cu)';
+    const better=isCu?(vL2>v1):(vL2<v1);
+    const arr=isCu?(better?'<span style="color:var(--sc)">▲</span>':'<span style="color:var(--dn)">▼</span>'):(better?'<span style="color:var(--sc)">▼</span>':'<span style="color:var(--dn)">▲</span>');
+    compH+=`<div class="comp-row"><span class="cel">${el.replace('Base (Cu)','Cu%')}</span><span class="cv">${v1>0?fv(v1):'-'}</span>${arr}<span class="cv" style="font-weight:600;color:${better?'var(--sc)':'var(--dn)'}">${vL2>0?fv(vL2):'-'}</span></div>`;
+  });
+  cDiv.innerHTML=compH;
+
+  // Total Impurezas bar
+  const iE=impurityElements();
+  const tots=L.map((_,i)=>iE.reduce((s,el)=>s+(d[el]?d[el][i]:0),0));
+  const c2=new Chart(document.getElementById('cCm'),{type:'bar',data:{labels:L,datasets:[{data:tots,backgroundColor:tots.map(v=>v>.5?'oklch(52% .16 25)':v>.05?'oklch(58% .14 70)':'oklch(50% .14 145)'),borderRadius:3,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:7}}},y:{ticks:{font:{size:7,family:'JetBrains Mono'},callback:v=>v.toFixed(3)+'%'}}}}});CH.push(c2);
+}
+
+// INIT
+uS();renderFotos();
+document.getElementById('authPassword').addEventListener('keydown',event=>{if(event.key==='Enter')signInUser()});
+initCloud();
+</script>
+</body>
+</html>
