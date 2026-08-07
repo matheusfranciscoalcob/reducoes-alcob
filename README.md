@@ -9,6 +9,8 @@ Aplicação web isolada para leitura OCR de laudos, histórico compartilhado de 
 - Supabase Postgres: corridas, amostras e catálogo dinâmico de elementos.
 - Supabase Storage: laudos em bucket privado.
 - Tesseract.js: OCR executado no navegador.
+- Agrupamento operacional: ano/mês + forno + fornada, preservando análises feitas em dias e turnos diferentes.
+- Monitoramento especial: códigos no formato `F#.MONITORAMENTO J#` são separados das fornadas e agrupados por forno, jumbo, mês e ano.
 
 O projeto Supabase `reducoes-alcob` é separado do projeto existente `Auditorias Alcob`.
 
@@ -23,6 +25,6 @@ O projeto Supabase `reducoes-alcob` é separado do projeto existente `Auditorias
 
 ## Banco
 
-As migrações versionadas estão em `supabase/migrations/`. As migrações `20260807173000_access_approval.sql` e `20260807174500_access_approval_hardening.sql` adicionam e reforçam o fluxo de aprovação.
+As migrações versionadas estão em `supabase/migrations/`. As migrações `20260807173000_access_approval.sql` e `20260807174500_access_approval_hardening.sql` adicionam e reforçam o fluxo de aprovação. A migração `20260807183000_analysis_grouping.sql` estrutura o código de cada análise e cria os índices de forno, fornada e jumbo.
 
 Para enviar confirmações a endereços que não pertencem à equipe do projeto Supabase, configure um servidor SMTP próprio em **Authentication → Email → SMTP Settings**. O SMTP padrão do Supabase é limitado a membros da equipe do projeto.
