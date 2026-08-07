@@ -413,7 +413,7 @@ tr:hover td{background:oklch(96% .006 145/.3)}
 <div class="access-overlay hidden" id="pendingOverlay">
   <div class="access-card narrow">
     <div class="auth-brand" style="justify-content:center"><div class="auth-mark">Cu</div><div style="text-align:left"><h2>Aguardando aprovação</h2><p class="lead">Sua conta ainda não tem acesso ao sistema.</p></div></div>
-    <p>A solicitação foi registrada e o responsável foi avisado. Depois da aprovação, atualize o status para liberar o histórico, os anexos e os dashboards.</p>
+    <p>A solicitação foi registrada e aparecerá no painel do responsável. Depois da aprovação, atualize o status para liberar o histórico, os anexos e os dashboards.</p>
     <div class="access-actions">
       <button class="auth-primary" type="button" onclick="refreshAccessStatus()">Atualizar status</button>
       <button class="auth-secondary" type="button" onclick="signOutUser()">Sair</button>
@@ -611,7 +611,7 @@ async function signUpUser(){
   if(error){showAuthMessage(error.message,true);return;}
   const notified=await notifyApprover();
   if(data.session)await applySession(data.session);
-  else showAuthMessage(`Solicitação criada. Confirme o e-mail recebido; depois, aguarde a aprovação do responsável.${notified?' O responsável foi avisado.':''}`);
+  else showAuthMessage(`Solicitação criada. Confirme o e-mail recebido e aguarde a aprovação.${notified?' O responsável foi avisado por e-mail.':' A solicitação já está visível no painel do responsável.'}`);
 }
 async function signOutUser(){
   if(!supabaseClient)return;
