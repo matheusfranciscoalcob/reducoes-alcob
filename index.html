@@ -761,8 +761,8 @@ function delS(i){if(current.samples.length<=1)return;current.samples.splice(i,1)
 
 function readFileDataUrl(file){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(file);})}
 function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('Não foi possível abrir a imagem.'));img.src=src;})}
-async function compressPhoto(file){
-  const original=await readFileDataUrl(file);
+async function compressPhoto(file,source){
+  const original=source||await readFileDataUrl(file);
   const img=await loadImage(original);
   const maxSide=1800,scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
   const canvas=document.createElement('canvas');canvas.width=Math.round(img.naturalWidth*scale);canvas.height=Math.round(img.naturalHeight*scale);
@@ -776,7 +776,8 @@ async function lP(i,e){
   sample.ocr={state:'loading',message:'Preparando a foto…',progress:3,found:0};
   renderFotos();
   try{
-    sample.photo=await compressPhoto(file);
+    sample.ocrSource=await readFileDataUrl(file);
+    sample.photo=await compressPhoto(file,sample.ocrSource);
     sample.photoName=file.name;
     sample.ocr={state:'queued',message:'Leitura aguardando…',progress:5,found:0};
     renderFotos();
@@ -822,6 +823,16 @@ async function prepareOcrImage(src){
   ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
   const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
   for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-128)*1.65+150));d[p]=d[p+1]=d[p+2]=v;}
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareFullPageImage(src){
+  const img=await loadImage(src),maxSide=2300;
+  const scale=Math.min(2.2,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-130)*1.55+155));d[p]=d[p+1]=d[p+2]=v;}
   ctx.putImageData(px,0,0);return canvas;
 }
 
@@ -938,47 +949,61 @@ function parseLaudoText(text){
   mergeReportSequence(found,numericTokens(text));
   return found;
 }
+function plausibleChemicalMap(values){
+  const count=Object.keys(values||{}).length,base=Number(values?.['Base (Cu)']||0),cuAg=Number(values?.['Cu+Ag']||0);
+  return count>=5&&(base>90||cuAg>90);
+}
 
 async function runSampleOcr(i){
   const sample=current.samples[i];if(!sample||!sample.photo)return;
-  let rawText='',newlyAdded=[];
+  let rawText='',newlyAdded=[],fallbackText='',fallbackResult=null;
   activeOcrSample=i;sample.ocr={state:'loading',message:'Preparando a leitura…',progress:8,found:0};renderFotos();
   try{
-    const worker=await getOcrWorker(),fullImage=await prepareOcrImage(sample.photo);
+    const source=sample.ocrSource||sample.photo;
+    const worker=await getOcrWorker(),fullImage=await prepareOcrImage(source);
     sample.ocr.state='recognizing';setOcrUi(i,'Lendo o laudo completo…',24);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
     const fullResult=await worker.recognize(fullImage),fullText=fullResult.data.text||'';
     const fullValues=parseLaudoText(fullText);
 
     setOcrUi(i,'Conferindo a coluna de valores…',48);
-    const numberImage=await prepareNumberColumn(sample.photo);
+    const numberImage=await prepareNumberColumn(source);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
     const numberResult=await worker.recognize(numberImage),numberText=numberResult.data.text||'',numberValues=numericTokens(numberText);
 
     setOcrUi(i,'Verificando a lista de elementos…',68);
-    const labelImage=await prepareLabelColumn(sample.photo);
+    const labelImage=await prepareLabelColumn(source);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()+',preserve_interword_spaces:'1'});
     const labelResult=await worker.recognize(labelImage),labelText=labelResult.data.text||'';
     const labelMap=mapLabelsToValues(parseLabelColumn(labelText),numberValues);
     newlyAdded=registerElements(Object.keys(labelMap));
     await syncElementsToCloud(newlyAdded);
-    const merged={...fullValues,...mergeReportSequence({...fullValues},numberValues),...labelMap};
+    let merged={...fullValues,...mergeReportSequence({...fullValues},numberValues),...labelMap};
+
+    if(Object.keys(merged).length<2){
+      setOcrUi(i,'Aplicando leitura de compatibilidade…',78);
+      const fullPageImage=await prepareFullPageImage(source);
+      await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+      fallbackResult=await worker.recognize(fullPageImage);fallbackText=fallbackResult.data.text||'';
+      const fallbackValues=parseLaudoText(fallbackText);
+      if(plausibleChemicalMap(fallbackValues))merged={...merged,...fallbackValues};
+    }
 
     setOcrUi(i,'Lendo data, turno e código…',84);
-    const headerImage=await prepareHeaderImage(sample.photo);
+    const headerImage=await prepareHeaderImage(source);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789/.:,-',preserve_interword_spaces:'1'});
     const headerResult=await worker.recognize(headerImage),headerText=headerResult.data.text||'';
-    const timestampImage=await prepareTimestampImage(sample.photo),timestampResult=await worker.recognize(timestampImage),timestampText=timestampResult.data.text||'';
+    const timestampImage=await prepareTimestampImage(source),timestampResult=await worker.recognize(timestampImage),timestampText=timestampResult.data.text||'';
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
-    const meta=parseHeaderMeta(`${headerText}\n${timestampText}`);applyHeaderMeta(meta);sample.meta=meta;
+    const meta=parseHeaderMeta(`${headerText}\n${timestampText}\n${fallbackText}`);applyHeaderMeta(meta);sample.meta=meta;
 
     const values=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]])),fields=Object.keys(values);
-    rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
-    if(fields.length<2)throw new Error(`O OCR processou a foto, mas não conseguiu localizar a tabela química (${fields.length}/${INP.length}).`);
+    rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- LEITURA DE COMPATIBILIDADE ---\n${fallbackText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
+    if(fields.length<2)throw new Error(`O OCR não localizou a tabela química (${fields.length}/${INP.length}). A imagem foi processada nos modos recortado e página inteira.`);
     sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
     const complete=fields.length===INP.length;
     const headerOk=meta.date&&meta.code&&meta.turno;
-    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberResult.data.confidence||0)),text:rawText};
+    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberResult.data.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
   }catch(err){sample.ocr={state:'error',message:err.message||'Não foi possível ler o laudo.',progress:0,found:0,text:rawText};}
   finally{activeOcrSample=-1;renderFotos();}
   if(newlyAdded.length)alert(`⚠ Novo${newlyAdded.length>1?'s elementos detectados':' elemento detectado'}: ${newlyAdded.join(', ')}.\n\n${newlyAdded.length>1?'Os campos foram incluídos':'O campo foi incluído'} em todo o sistema. As análises anteriores receberam valor zero.`);
