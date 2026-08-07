@@ -5,7 +5,7 @@ Aplicação web isolada para leitura OCR de laudos, histórico compartilhado de 
 ## Arquitetura
 
 - GitHub Pages: hospedagem estática.
-- Supabase Auth: acesso por e-mail e senha.
+- Supabase Auth: confirmação de e-mail, acesso por senha e aprovação administrativa.
 - Supabase Postgres: corridas, amostras e catálogo dinâmico de elementos.
 - Supabase Storage: laudos em bucket privado.
 - Tesseract.js: OCR executado no navegador.
@@ -14,11 +14,15 @@ O projeto Supabase `reducoes-alcob` é separado do projeto existente `Auditorias
 
 ## Segurança
 
-- Somente usuários autenticados acessam dados e fotos.
+- Uma conta nova começa como solicitação pendente e não acessa dados nem fotos.
+- Somente `matheusferfran2010@gmail.com` pode aprovar ou revogar acessos pela interface.
+- A aprovação é aplicada no banco por RLS; ocultar a interface não é a única barreira.
 - Row Level Security está habilitado em todas as tabelas.
 - O bucket `lab-reports` é privado.
 - O navegador recebe somente a chave publicável; nenhuma chave secreta é incluída no repositório.
 
 ## Banco
 
-A migração versionada está em `supabase/migrations/20260807153000_initial_schema.sql`.
+As migrações versionadas estão em `supabase/migrations/`. As migrações `20260807173000_access_approval.sql` e `20260807174500_access_approval_hardening.sql` adicionam e reforçam o fluxo de aprovação.
+
+Para enviar confirmações a endereços que não pertencem à equipe do projeto Supabase, configure um servidor SMTP próprio em **Authentication → Email → SMTP Settings**. O SMTP padrão do Supabase é limitado a membros da equipe do projeto.

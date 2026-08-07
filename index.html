@@ -213,6 +213,19 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',system-ui,sans-serif;b
 .auth-primary{background:var(--ac);color:white}.auth-secondary{background:var(--bg);color:var(--t2);border:1px solid var(--bd)!important}
 .auth-message{min-height:32px;margin-top:10px;font-size:.56rem;line-height:1.4;color:var(--tm)}
 .auth-message.err{color:var(--dn)}.auth-message.ok{color:var(--sc)}
+.access-overlay{position:fixed;inset:0;z-index:2050;background:linear-gradient(145deg,oklch(94% .02 145),oklch(94% .015 55));display:flex;align-items:center;justify-content:center;padding:20px}
+.access-overlay.hidden{display:none}
+.access-card{width:min(620px,94vw);max-height:86vh;overflow:auto;background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:24px;box-shadow:0 24px 80px oklch(20% .02 55/.16)}
+.access-card.narrow{width:min(430px,94vw);text-align:center}
+.access-card h2{font-size:1rem;margin-bottom:7px}.access-card>p{font-size:.64rem;line-height:1.55;color:var(--t2)}
+.access-card .auth-primary,.access-card .auth-secondary{padding:8px 13px;border-radius:7px;font-size:.62rem;font-weight:700;cursor:pointer}
+.access-actions{display:flex;gap:7px;justify-content:center;margin-top:16px}
+.approval-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px}.approval-head div{flex:1}.approval-head button{flex:0 0 auto}
+.approval-list{display:grid;gap:7px}.approval-empty{padding:18px;border:1px dashed var(--bd);border-radius:8px;text-align:center;font-size:.62rem;color:var(--tm)}
+.approval-row{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg)}
+.approval-person{min-width:0;flex:1}.approval-email{font-size:.64rem;font-weight:700;overflow-wrap:anywhere}.approval-date{font-size:.5rem;color:var(--tm);margin-top:2px}
+.approval-status{font-size:.5rem;font-weight:800;padding:3px 7px;border-radius:99px}.approval-status.pending{background:oklch(95% .035 70);color:var(--wn)}.approval-status.approved{background:oklch(94% .03 155);color:var(--sc)}
+.approval-control{padding:6px 9px;border-radius:6px;border:1px solid var(--bd);background:var(--sf);font-size:.54rem;font-weight:700;cursor:pointer}.approval-control.approve{background:var(--ac);border-color:var(--ac);color:white}.approval-control.revoke{color:var(--dn)}
 .loading-overlay{position:fixed;inset:0;z-index:1900;background:oklch(98% .003 55/.88);display:none;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--t2)}
 .loading-overlay.on{display:flex}
 
@@ -296,6 +309,7 @@ tr:hover td{background:oklch(96% .006 145/.3)}
       <span class="hist-count" id="histCount"></span>
       <span class="sync-pill" id="syncPill">offline</span>
       <span class="cloud-user" id="cloudUser"></span>
+      <button class="btn-logout" id="approvalsBtn" type="button" onclick="openApprovals()" style="display:none">Solicitações <span id="approvalCount"></span></button>
       <button class="btn-logout" id="logoutBtn" type="button" onclick="signOutUser()">Sair</button>
     </div>
   </header>
@@ -391,9 +405,28 @@ tr:hover td{background:oklch(96% .006 145/.3)}
     <input type="password" id="authPassword" autocomplete="current-password" placeholder="Mínimo de 8 caracteres">
     <div class="auth-buttons">
       <button class="auth-primary" type="button" onclick="signInUser()">Entrar</button>
-      <button class="auth-secondary" type="button" onclick="signUpUser()">Criar conta</button>
+      <button class="auth-secondary" type="button" onclick="signUpUser()">Solicitar acesso</button>
     </div>
-    <p class="auth-message" id="authMessage">Use uma conta autorizada para acessar o histórico compartilhado.</p>
+    <p class="auth-message" id="authMessage">Novas contas só acessam o sistema depois da aprovação do responsável.</p>
+  </div>
+</div>
+<div class="access-overlay hidden" id="pendingOverlay">
+  <div class="access-card narrow">
+    <div class="auth-brand" style="justify-content:center"><div class="auth-mark">Cu</div><div style="text-align:left"><h2>Aguardando aprovação</h2><p class="lead">Sua conta ainda não tem acesso ao sistema.</p></div></div>
+    <p>A solicitação foi registrada e o responsável foi avisado. Depois da aprovação, atualize o status para liberar o histórico, os anexos e os dashboards.</p>
+    <div class="access-actions">
+      <button class="auth-primary" type="button" onclick="refreshAccessStatus()">Atualizar status</button>
+      <button class="auth-secondary" type="button" onclick="signOutUser()">Sair</button>
+    </div>
+  </div>
+</div>
+<div class="access-overlay hidden" id="approvalOverlay">
+  <div class="access-card">
+    <div class="approval-head">
+      <div><h2>Solicitações de acesso</h2><p>Somente contas aprovadas conseguem ler ou alterar dados e anexos.</p></div>
+      <button class="auth-secondary" type="button" onclick="closeApprovals()">Fechar</button>
+    </div>
+    <div class="approval-list" id="approvalList"></div>
   </div>
 </div>
 <div class="loading-overlay" id="loadingOverlay">Sincronizando dados com o servidor…</div>
@@ -446,7 +479,9 @@ function registerElements(names){
   return added;
 }
 
-let supabaseClient=null,authUser=null,activeAccessToken;
+const APPROVER_EMAIL='matheusferfran2010@gmail.com';
+const SITE_URL='https://matheusfranciscoalcob.github.io/reducoes-alcob/';
+let supabaseClient=null,authUser=null,activeAccessToken,accessProfile=null,approvalRows=[];
 
 function setCloudLoading(on,message='Sincronizando dados com o servidor…'){
   const overlay=document.getElementById('loadingOverlay');
@@ -474,17 +509,89 @@ async function initCloud(){
   await applySession(data.session);
   supabaseClient.auth.onAuthStateChange((_event,session)=>setTimeout(()=>applySession(session),0));
 }
-async function applySession(session){
+async function applySession(session,force=false){
   const token=session?.access_token||null;
-  if(activeAccessToken===token)return;
+  if(!force&&activeAccessToken===token)return;
   activeAccessToken=token;authUser=session?.user||null;
   document.getElementById('authOverlay').classList.toggle('hidden',!!authUser);
   document.getElementById('cloudUser').textContent=authUser?.email||'';
   document.getElementById('logoutBtn').style.display=authUser?'inline-block':'none';
-  if(!authUser){archive=[];viewId=null;setSyncPill('aguardando login');uS();renderFotos();return;}
+  if(!authUser){
+    accessProfile=null;archive=[];viewId=null;
+    document.getElementById('pendingOverlay').classList.add('hidden');
+    document.getElementById('approvalOverlay').classList.add('hidden');
+    document.getElementById('approvalsBtn').style.display='none';
+    setSyncPill('aguardando login');uS();renderFotos();return;
+  }
   showAuthMessage('Conta conectada.');
-  await loadCloudData();
+  await loadAccessProfile();
 }
+function isApprover(){return String(authUser?.email||'').toLowerCase()===APPROVER_EMAIL}
+async function loadAccessProfile(){
+  if(!supabaseClient||!authUser)return false;
+  const {data,error}=await supabaseClient.from('user_access').select('user_id,email,approved,requested_at,approved_at').eq('user_id',authUser.id).maybeSingle();
+  if(error&&!isApprover()){
+    console.error(error);setSyncPill('erro de acesso',true);document.getElementById('pendingOverlay').classList.remove('hidden');return false;
+  }
+  accessProfile=data||{user_id:authUser.id,email:authUser.email,approved:isApprover()};
+  const approved=isApprover()||accessProfile.approved===true;
+  document.getElementById('approvalsBtn').style.display=isApprover()?'inline-block':'none';
+  document.getElementById('pendingOverlay').classList.toggle('hidden',approved);
+  if(!approved){
+    archive=[];viewId=null;setSyncPill('aguardando aprovação');uS();renderFotos();return false;
+  }
+  await loadCloudData();
+  if(isApprover()){
+    await loadApprovalRequests();
+    if(new URLSearchParams(location.search).get('approvals')==='1')openApprovals(false);
+  }
+  return true;
+}
+async function refreshAccessStatus(){
+  setCloudLoading(true,'Verificando aprovação…');
+  try{await applySession((await supabaseClient.auth.getSession()).data.session,true)}finally{setCloudLoading(false)}
+}
+async function notifyApprover(){
+  const reviewUrl=SITE_URL+'?approvals=1';
+  const {error}=await supabaseClient.auth.signInWithOtp({email:APPROVER_EMAIL,options:{shouldCreateUser:false,emailRedirectTo:reviewUrl}});
+  if(error){console.warn('Não foi possível enviar o aviso de aprovação:',error.message);return false}
+  return true;
+}
+async function loadApprovalRequests(){
+  if(!isApprover())return;
+  const {data,error}=await supabaseClient.from('user_access').select('user_id,email,approved,requested_at,approved_at').order('approved',{ascending:true}).order('requested_at',{ascending:false});
+  const list=document.getElementById('approvalList');
+  if(error){list.innerHTML='<div class="approval-empty">Não foi possível carregar as solicitações.</div>';console.error(error);return}
+  const rows=(data||[]).filter(row=>String(row.email).toLowerCase()!==APPROVER_EMAIL);
+  approvalRows=rows;
+  const pending=rows.filter(row=>!row.approved).length;
+  document.getElementById('approvalCount').textContent=pending?`(${pending})`:'';
+  if(!rows.length){list.innerHTML='<div class="approval-empty">Nenhuma solicitação recebida.</div>';return}
+  list.innerHTML=rows.map(row=>{
+    const date=new Date(row.requested_at).toLocaleString('pt-BR');
+    const status=row.approved?'<span class="approval-status approved">Aprovado</span>':'<span class="approval-status pending">Pendente</span>';
+    const action=row.approved
+      ?`<button class="approval-control revoke" type="button" onclick="setAccessApproval('${row.user_id}',false)">Revogar</button>`
+      :`<button class="approval-control approve" type="button" onclick="setAccessApproval('${row.user_id}',true)">Aprovar</button>`;
+    return `<div class="approval-row"><div class="approval-person"><div class="approval-email">${esc(row.email)}</div><div class="approval-date">Solicitado em ${date}</div></div>${status}${action}</div>`;
+  }).join('');
+}
+async function setAccessApproval(userId,approved){
+  if(!isApprover())return;
+  const email=approvalRows.find(row=>row.user_id===userId)?.email||'esta conta';
+  const verb=approved?'aprovar':'revogar o acesso de';
+  if(!confirm(`Deseja ${verb} ${email}?`))return;
+  const changes={approved,approved_at:approved?new Date().toISOString():null,approved_by:approved?authUser.id:null};
+  const {error}=await supabaseClient.from('user_access').update(changes).eq('user_id',userId);
+  if(error){alert('Não foi possível atualizar o acesso: '+error.message);return}
+  await loadApprovalRequests();
+}
+async function openApprovals(reload=true){
+  if(!isApprover())return;
+  document.getElementById('approvalOverlay').classList.remove('hidden');
+  if(reload)await loadApprovalRequests();
+}
+function closeApprovals(){document.getElementById('approvalOverlay').classList.add('hidden')}
 async function signInUser(){
   if(!supabaseClient)return;
   const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;
@@ -499,11 +606,12 @@ async function signUpUser(){
   const email=document.getElementById('authEmail').value.trim(),password=document.getElementById('authPassword').value;
   if(!email||password.length<8){showAuthMessage('Informe um e-mail válido e uma senha com pelo menos 8 caracteres.',true);return;}
   showAuthMessage('Criando a conta…');
-  const returnUrl=location.href.split(/[?#]/)[0];
+  const returnUrl=SITE_URL;
   const {data,error}=await supabaseClient.auth.signUp({email,password,options:{emailRedirectTo:returnUrl}});
   if(error){showAuthMessage(error.message,true);return;}
+  const notified=await notifyApprover();
   if(data.session)await applySession(data.session);
-  else showAuthMessage('Conta criada. Confirme o e-mail recebido e depois clique em Entrar.');
+  else showAuthMessage(`Solicitação criada. Confirme o e-mail recebido; depois, aguarde a aprovação do responsável.${notified?' O responsável foi avisado.':''}`);
 }
 async function signOutUser(){
   if(!supabaseClient)return;
@@ -836,21 +944,27 @@ async function runSampleOcr(i){
   let rawText='',newlyAdded=[];
   activeOcrSample=i;sample.ocr={state:'loading',message:'Preparando a leitura…',progress:8,found:0};renderFotos();
   try{
-    const worker=await getOcrWorker();sample.ocr.state='recognizing';setOcrUi(i,'Lendo a coluna de valores…',30);
+    const worker=await getOcrWorker(),fullImage=await prepareOcrImage(sample.photo);
+    sample.ocr.state='recognizing';setOcrUi(i,'Lendo o laudo completo…',24);
+    await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
+    const fullResult=await worker.recognize(fullImage),fullText=fullResult.data.text||'';
+    const fullValues=parseLaudoText(fullText);
+
+    setOcrUi(i,'Conferindo a coluna de valores…',48);
     const numberImage=await prepareNumberColumn(sample.photo);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
     const numberResult=await worker.recognize(numberImage),numberText=numberResult.data.text||'',numberValues=numericTokens(numberText);
 
-    setOcrUi(i,'Verificando a lista de elementos…',64);
+    setOcrUi(i,'Verificando a lista de elementos…',68);
     const labelImage=await prepareLabelColumn(sample.photo);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz()+',preserve_interword_spaces:'1'});
     const labelResult=await worker.recognize(labelImage),labelText=labelResult.data.text||'';
     const labelMap=mapLabelsToValues(parseLabelColumn(labelText),numberValues);
     newlyAdded=registerElements(Object.keys(labelMap));
     await syncElementsToCloud(newlyAdded);
-    const merged={...mergeReportSequence({},numberValues),...labelMap};
+    const merged={...fullValues,...mergeReportSequence({...fullValues},numberValues),...labelMap};
 
-    setOcrUi(i,'Lendo data, turno e código…',82);
+    setOcrUi(i,'Lendo data, turno e código…',84);
     const headerImage=await prepareHeaderImage(sample.photo);
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789/.:,-',preserve_interword_spaces:'1'});
     const headerResult=await worker.recognize(headerImage),headerText=headerResult.data.text||'';
@@ -859,12 +973,12 @@ async function runSampleOcr(i){
     const meta=parseHeaderMeta(`${headerText}\n${timestampText}`);applyHeaderMeta(meta);sample.meta=meta;
 
     const values=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]])),fields=Object.keys(values);
-    rawText=`--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
-    if(fields.length<2)throw new Error(`Leitura insuficiente (${fields.length}/${INP.length}). Tente uma foto mais reta e nítida.`);
+    rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
+    if(fields.length<2)throw new Error(`O OCR processou a foto, mas não conseguiu localizar a tabela química (${fields.length}/${INP.length}).`);
     sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
     const complete=fields.length===INP.length;
     const headerOk=meta.date&&meta.code&&meta.turno;
-    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(numberResult.data.confidence||0),text:rawText};
+    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberResult.data.confidence||0)),text:rawText};
   }catch(err){sample.ocr={state:'error',message:err.message||'Não foi possível ler o laudo.',progress:0,found:0,text:rawText};}
   finally{activeOcrSample=-1;renderFotos();}
   if(newlyAdded.length)alert(`⚠ Novo${newlyAdded.length>1?'s elementos detectados':' elemento detectado'}: ${newlyAdded.join(', ')}.\n\n${newlyAdded.length>1?'Os campos foram incluídos':'O campo foi incluído'} em todo o sistema. As análises anteriores receberam valor zero.`);
