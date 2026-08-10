@@ -978,7 +978,23 @@ async function prepareCodeImage(src){
   const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
   const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
-  for(let p=0;p<d.length;p+=4){const gray=.299*d[p]+.587*d[p+1]+.114*d[p+2];const v=Math.max(0,Math.min(255,(gray-132)*1.75+158));d[p]=d[p+1]=d[p+2]=v;}
+  for(let p=0;p<d.length;p+=4){
+    // Remove tinta azul das anotações e círculos sem apagar o texto preto impresso.
+    const blueInk=d[p+2]-d[p]>18&&d[p+2]-d[p+1]>10;
+    const gray=blueInk?255:.299*d[p]+.587*d[p+1]+.114*d[p+2],v=Math.max(0,Math.min(255,(gray-132)*1.75+158));d[p]=d[p+1]=d[p+2]=v;
+  }
+  ctx.putImageData(px,0,0);return canvas;
+}
+
+async function prepareCodePageImage(src){
+  const img=await loadImage(src),maxSide=2600,scale=Math.min(2.2,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  const px=ctx.getImageData(0,0,canvas.width,canvas.height),d=px.data;
+  for(let p=0;p<d.length;p+=4){
+    const blueInk=d[p+2]-d[p]>18&&d[p+2]-d[p+1]>10;
+    const gray=blueInk?255:.299*d[p]+.587*d[p+1]+.114*d[p+2],v=Math.max(0,Math.min(255,(gray-130)*1.6+155));d[p]=d[p+1]=d[p+2]=v;
+  }
   ctx.putImageData(px,0,0);return canvas;
 }
 
@@ -1004,12 +1020,22 @@ function labelFromLine(line){
   const clean=line.replace(/^[\s|:;!\[\]()]+/,'');const hit=LABEL_PATTERNS.find(([,re])=>re.test(clean));return hit?hit[0]:null;
 }
 function numericTokens(text){
-  const clean=text.replace(/[Oo](?=\s*[.,]\s*\d)/g,'0').replace(/\b(99|0)\s+(\d{3,6})\b/g,'$1.$2');
-  return [...clean.matchAll(/(?<!\d)(?:99|0)[.,]\s*\d{3,6}(?!\d)/g)].map(m=>parseFloat(m[0].replace(/\s/g,'').replace(',','.'))).filter(Number.isFinite);
+  const clean=text.replace(/[Oo](?=\s*[.,]\s*\d)/g,'0').replace(/(?<!\d)9([.,]\s*\d{3,6})(?!\d)/g,'0$1').replace(/\b(100|9[89]|0)\s+(\d{3,6})\b/g,'$1.$2');
+  return [...clean.matchAll(/(?<!\d)(?:100|9[89]|0)[.,]\s*\d{3,6}(?!\d)/g)].map(m=>parseFloat(m[0].replace(/\s/g,'').replace(',','.'))).filter(Number.isFinite);
+}
+function looseNumericTokens(text){
+  const joined=String(text||'').replace(/(?<!\d)(100|9[89]|0)\s*[.,]\s+(\d{3,6})(?!\d)/g,'$1.$2'),values=[];
+  joined.split(/\r?\n/).forEach(raw=>{
+    const line=raw.trim(),precise=numericTokens(line);
+    if(precise.length){values.push(...precise);return;}
+    if(/^\d{4}$/.test(line))values.push(Number(`0.${line}`));
+    else if(/^0\d{4}$/.test(line))values.push(Number(`0.${line.slice(1)}`));
+  });
+  return values.filter(Number.isFinite);
 }
 function plausibleElementValue(element,value){
   if(!Number.isFinite(value))return false;
-  if(element==='Base (Cu)'||element==='Cu+Ag')return value>=90&&value<=101;
+  if(element==='Base (Cu)'||element==='Cu+Ag')return value>=98&&value<=100;
   return value>=0&&value<10;
 }
 function reportSequence(all){
@@ -1037,6 +1063,17 @@ function reportSequence(all){
       const cuAg=Number((head[0]+head[REPORT_ORDER.indexOf('Ag')]).toFixed(6));
       if(plausibleElementValue('Cu+Ag',cuAg))return[...head,cuAg];
     }
+  }
+  return null;
+}
+function recoveredPageSequence(all){
+  const exact=reportSequence(all);if(exact)return exact;
+  const tailOrder=REPORT_ORDER.slice(1);
+  for(let end=all.length;end>=tailOrder.length;end--){
+    const tail=all.slice(end-tailOrder.length,end);
+    if(!tailOrder.every((el,i)=>plausibleElementValue(el,tail[i])))continue;
+    const ag=tail[REPORT_ORDER.indexOf('Ag')-1],cuAg=tail[tail.length-1],base=Number((cuAg-ag).toFixed(6));
+    if(plausibleElementValue('Base (Cu)',base))return[base,...tail];
   }
   return null;
 }
@@ -1070,10 +1107,13 @@ function parseHeaderMeta(text){
   const clean=String(text||'').replace(/\s+/g,' '),compact=clean.replace(/\s/g,''),meta={};
   const stuck=compact.match(/(\d{2})[\/.\-](\d{2})[\/.\-](\d{2})([01]\d|2[0-3])[:.](\d{2})/);
   if(stuck){meta.date=`20${stuck[3]}-${stuck[2]}-${stuck[1]}`;meta.time=`${stuck[4]}:${stuck[5]}`;meta.turno=turnoFromHour(parseInt(stuck[4],10));}
+  if(!meta.time){const attached=compact.match(/\d{2}[\/.\-]\d{2}[\/.\-](?:20\d{2}|\d{2})([01]\d|2[0-3])[:.](\d{2})/);if(attached){meta.time=`${attached[1]}:${attached[2]}`;meta.turno=turnoFromHour(parseInt(attached[1],10));}}
+  if(!meta.time){const colonTime=clean.match(/([01]\d|2[0-3]):(\d{2})(?::(\d{2}))?/);if(colonTime){meta.time=`${colonTime[1]}:${colonTime[2]}${colonTime[3]?':'+colonTime[3]:''}`;meta.turno=turnoFromHour(parseInt(colonTime[1],10));}}
   if(!meta.date){const date=clean.match(/\b(\d{2})[\/.\-](\d{2})[\/.\-](20\d{2}|\d{2})(?!\d)/);if(date){const year=date[3].length===2?'20'+date[3]:date[3];meta.date=`${year}-${date[2]}-${date[1]}`;}}
   if(!meta.time){const time=clean.match(/\b([01]\d|2[0-3])[:.](\d{2})(?:[:.](\d{2}))?\b/);if(time){meta.time=`${time[1]}:${time[2]}${time[3]?':'+time[3]:''}`;meta.turno=turnoFromHour(parseInt(time[1],10));}}
   const code=compact.match(/(20\d{6})[.,]?(\d{4})[.,](\d+)[.,](\d+)[.,](\d+)/);
   if(code)meta.code=`${code[1]}.${code[2]}.${code[3]}.${code[4]}.${code[5]}`;
+  if(!meta.code){const looseCode=compact.match(/(20\d{6})[.,]?(\d{4})[.,()\-:]*(\d)[.,()\-:]*(\d)[.,()\-:]*(\d)(?!\d)/);if(looseCode)meta.code=`${looseCode[1]}.${looseCode[2]}.${looseCode[3]}.${looseCode[4]}.${looseCode[5]}`;}
   if(!meta.code){const jumbo=compact.match(/F\s*(\d+)[.\-:]?MONITORAMENTO[.\-:]?J\s*(\d+)/i);if(jumbo)meta.code=`F${Number(jumbo[1])}.MONITORAMENTO J${Number(jumbo[2])}`;}
   if(meta.code){const structured=parseAnalysisCode(meta.code,meta.date);Object.assign(meta,structured);if(!meta.date&&structured.date)meta.date=structured.date;}
   return meta;
@@ -1112,9 +1152,18 @@ async function runSampleOcr(i){
     const fullValues=parseLaudoText(fullText);
 
     setOcrUi(i,'Conferindo a coluna de valores…',48);
-    const numberImage=await prepareNumberColumn(source,'full');
+    const numberImage=await prepareNumberColumn(source,'full');let pageWideImage=null;
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
     let numberResult=await worker.recognize(numberImage),numberText=`--- RECORTE COMPLETO ---\n${numberResult.data.text||''}`,numberValues=numericTokens(numberResult.data.text||''),numberSequence=reportSequence(numberValues),numberConfidence=numberResult.data.confidence||0;
+    if(!numberSequence){
+      setOcrUi(i,'Lendo valores separados pela inclinação…',54);
+      await worker.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
+      const sparseResult=await worker.recognize(numberImage),sparseText=sparseResult.data.text||'',sparseValues=looseNumericTokens(sparseText),sparseSequence=reportSequence(sparseValues);
+      numberText+=`\n--- LEITURA ESPARSA ---\n${sparseText}`;numberConfidence=Math.max(numberConfidence,sparseResult.data.confidence||0);
+      if(sparseSequence){numberValues=sparseValues;numberSequence=sparseSequence;numberResult=sparseResult;}
+      else if(sparseValues.length>numberValues.length)numberValues=sparseValues;
+      await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
+    }
     if(!numberSequence){
       setOcrUi(i,'Ajustando o enquadramento da coluna…',54);
       const wideResult=await worker.recognize(await prepareNumberColumn(source,'wide')),wideText=wideResult.data.text||'',wideValues=numericTokens(wideText),wideSequence=reportSequence(wideValues);
@@ -1129,6 +1178,15 @@ async function runSampleOcr(i){
       if(legacySequence){numberValues=legacyValues;numberSequence=legacySequence;numberResult=legacyResult;}
       else if(legacyValues.length>numberValues.length)numberValues=legacyValues;
     }
+    if(!numberSequence){
+      setOcrUi(i,'Localizando a tabela na página inteira…',65);
+      pageWideImage=await prepareFullPageImage(source);
+      await worker.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
+      const pageNumberResult=await worker.recognize(pageWideImage),pageNumberText=pageNumberResult.data.text||'',pageNumberValues=looseNumericTokens(pageNumberText),pageNumberSequence=recoveredPageSequence(pageNumberValues);
+      numberText+=`\n--- PÁGINA INTEIRA ESPARSA ---\n${pageNumberText}`;numberConfidence=Math.max(numberConfidence,pageNumberResult.data.confidence||0);
+      if(pageNumberSequence){numberValues=pageNumberValues;numberSequence=pageNumberSequence;numberResult=pageNumberResult;}
+      else if(pageNumberValues.length>numberValues.length)numberValues=pageNumberValues;
+    }
 
     setOcrUi(i,'Verificando a lista de elementos…',68);
     const labelImage=await prepareLabelColumn(source);
@@ -1142,7 +1200,7 @@ async function runSampleOcr(i){
 
     if(Object.keys(merged).length<REPORT_ORDER.length){
       setOcrUi(i,'Aplicando leitura de compatibilidade…',78);
-      const fullPageImage=await prepareFullPageImage(source);
+      const fullPageImage=pageWideImage||await prepareFullPageImage(source);
       await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
       fallbackResult=await worker.recognize(fullPageImage);fallbackText=fallbackResult.data.text||'';
       const fallbackValues=parseLaudoText(fallbackText);
@@ -1158,15 +1216,22 @@ async function runSampleOcr(i){
     const headerResult=await worker.recognize(headerImage),headerText=headerResult.data.text||'';
     const timestampImage=await prepareTimestampImage(source),timestampResult=await worker.recognize(timestampImage),timestampText=timestampResult.data.text||'';
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
-    const meta=parseHeaderMeta(`${codeText}\n${fullText}\n${headerText}\n${timestampText}\n${fallbackText}`);applyHeaderMeta(meta,sample);sample.meta={...(sample.meta||{}),...meta};
+    let codePageResult=null,codePageText='',meta=parseHeaderMeta(`${codeText}\n${fullText}\n${headerText}\n${timestampText}\n${fallbackText}`);
+    if(!meta.code){
+      setOcrUi(i,'Procurando o código na página inteira…',90);
+      await worker.setParameters({tessedit_pageseg_mode:'11',tessedit_char_whitelist:'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,:/()-',preserve_interword_spaces:'1'});
+      codePageResult=await worker.recognize(await prepareCodePageImage(source));codePageText=codePageResult.data.text||'';
+      meta=parseHeaderMeta(`${codePageText}\n${codeText}\n${fullText}\n${headerText}\n${timestampText}\n${fallbackText}`);
+    }
+    applyHeaderMeta(meta,sample);sample.meta={...(sample.meta||{}),...meta};
 
     const values=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]])),fields=Object.keys(values);
-    rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CÓDIGO ---\n${codeText}\n\n--- LEITURA DE COMPATIBILIDADE ---\n${fallbackText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
+    rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CÓDIGO ---\n${codeText}\n\n--- CÓDIGO NA PÁGINA INTEIRA ---\n${codePageText}\n\n--- LEITURA DE COMPATIBILIDADE ---\n${fallbackText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
     if(fields.length<2)throw new Error(`O OCR não localizou a tabela química (${fields.length}/${INP.length}). A imagem foi processada nos modos recortado e página inteira.`);
     sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
     const complete=fields.length===INP.length;
     const headerOk=meta.date&&meta.code&&meta.turno;
-    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberConfidence,codeResult.data.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
+    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberConfidence,codeResult.data.confidence||0,codePageResult?.data?.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
   }catch(err){sample.ocr={state:'error',message:err.message||'Não foi possível ler o laudo.',progress:0,found:0,text:rawText};}
   finally{activeOcrSample=-1;renderFotos();}
   if(newlyAdded.length)alert(`⚠ Novo${newlyAdded.length>1?'s elementos detectados':' elemento detectado'}: ${newlyAdded.join(', ')}.\n\n${newlyAdded.length>1?'Os campos foram incluídos':'O campo foi incluído'} em todo o sistema. As análises anteriores receberam valor zero.`);
