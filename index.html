@@ -931,10 +931,14 @@ async function prepareFullPageImage(src){
   ctx.putImageData(px,0,0);return canvas;
 }
 
-async function prepareNumberColumn(src){
+async function prepareNumberColumn(src,variant='wide'){
   const img=await loadImage(src);
-  const sx=Math.round(img.naturalWidth*.425),sy=Math.round(img.naturalHeight*.312);
-  const sw=Math.round(img.naturalWidth*.17),sh=Math.round(img.naturalHeight*.50),scale=5;
+  // O enquadramento das fotos varia. O recorte precisa começar acima de "Base (Cu)"
+  // e terminar depois de "Cu+Ag", sem depender da posição exata da folha.
+  const legacy=variant==='legacy',full=variant==='full';
+  const sx=Math.round(img.naturalWidth*(legacy ? .425 : .40)),sy=Math.round(img.naturalHeight*(legacy ? .312 : full ? .18 : .245));
+  const sw=Math.round(img.naturalWidth*(legacy ? .17 : .25)),sh=Math.round(img.naturalHeight*(legacy ? .50 : full ? .64 : .57));
+  const scale=Math.max(2,Math.min(5,1800/sw,5200/sh));
   const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
@@ -945,8 +949,8 @@ async function prepareNumberColumn(src){
 
 async function prepareLabelColumn(src){
   const img=await loadImage(src);
-  const sx=Math.round(img.naturalWidth*.055),sy=Math.round(img.naturalHeight*.312);
-  const sw=Math.round(img.naturalWidth*.205),sh=Math.round(img.naturalHeight*.50),scale=5;
+  const sx=Math.round(img.naturalWidth*.045),sy=Math.round(img.naturalHeight*.245);
+  const sw=Math.round(img.naturalWidth*.255),sh=Math.round(img.naturalHeight*.57),scale=5;
   const canvas=document.createElement('canvas');canvas.width=Math.round(sw*scale);canvas.height=Math.round(sh*scale);
   const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.drawImage(img,sx,sy,sw,sh,0,0,canvas.width,canvas.height);
@@ -1003,9 +1007,41 @@ function numericTokens(text){
   const clean=text.replace(/[Oo](?=\s*[.,]\s*\d)/g,'0').replace(/\b(99|0)\s+(\d{3,6})\b/g,'$1.$2');
   return [...clean.matchAll(/(?<!\d)(?:99|0)[.,]\s*\d{3,6}(?!\d)/g)].map(m=>parseFloat(m[0].replace(/\s/g,'').replace(',','.'))).filter(Number.isFinite);
 }
+function plausibleElementValue(element,value){
+  if(!Number.isFinite(value))return false;
+  if(element==='Base (Cu)'||element==='Cu+Ag')return value>=90&&value<=101;
+  return value>=0&&value<10;
+}
+function reportSequence(all){
+  for(let start=0;start+REPORT_ORDER.length<=all.length;start++){
+    const seq=all.slice(start,start+REPORT_ORDER.length);
+    if(REPORT_ORDER.every((el,i)=>plausibleElementValue(el,seq[i])))return seq;
+  }
+  // Alguns laudos têm uma linha horizontal atravessando o valor de Base (Cu).
+  // Se todos os outros 25 valores estiverem presentes e ordenados, recupera Cu
+  // pela identidade impressa no relatório: Cu+Ag = Base (Cu) + Ag.
+  const withoutBase=REPORT_ORDER.slice(1);
+  if(all.length===withoutBase.length){
+    const tail=all;
+    if(withoutBase.every((el,i)=>plausibleElementValue(el,tail[i]))){
+      const ag=tail[REPORT_ORDER.indexOf('Ag')-1],cuAg=tail[tail.length-1];
+      const base=Number((cuAg-ag).toFixed(6));
+      if(plausibleElementValue('Base (Cu)',base))return[base,...tail];
+    }
+  }
+  // Caso simétrico: recupera Cu+Ag quando apenas a última linha não for lida.
+  const withoutCuAg=REPORT_ORDER.slice(0,-1);
+  if(all.length===withoutCuAg.length){
+    const head=all;
+    if(withoutCuAg.every((el,i)=>plausibleElementValue(el,head[i]))){
+      const cuAg=Number((head[0]+head[REPORT_ORDER.indexOf('Ag')]).toFixed(6));
+      if(plausibleElementValue('Cu+Ag',cuAg))return[...head,cuAg];
+    }
+  }
+  return null;
+}
 function mergeReportSequence(found,all){
-  let seq=null;
-  for(let start=0;start+REPORT_ORDER.length<=all.length;start++)if(all[start]>90&&all[start+REPORT_ORDER.length-1]>90){seq=all.slice(start,start+REPORT_ORDER.length);break;}
+  const seq=reportSequence(all);
   if(seq)REPORT_ORDER.forEach((el,i)=>{found[el]=seq[i]});
   return found;
 }
@@ -1047,13 +1083,13 @@ function applyHeaderMeta(meta,sample){
   if(sample&&meta.code){sample.analysisCode=meta.code;sample.meta={...meta,...parseAnalysisCode(meta.code,meta.date||current.date)};}
 }
 function parseLaudoText(text){
-  const found={};let pending=null,pendingAge=0;
+  const found={};
   text.split(/\r?\n/).forEach(raw=>{
     const line=raw.trim();if(!line)return;
     const label=labelFromLine(line),nums=numericTokens(line);
-    if(label){if(nums.length)found[label]=nums[nums.length-1];else{pending=label;pendingAge=0;}}
-    else if(pending&&nums.length){found[pending]=nums[0];pending=null;}
-    if(pending&&++pendingAge>2)pending=null;
+    // Só associa rótulo e número quando ambos aparecem na mesma linha.
+    // Isso impede que um valor ausente desloque toda a tabela para cima.
+    if(label&&nums.length){const value=nums[nums.length-1];if(plausibleElementValue(label,value))found[label]=value;}
   });
   mergeReportSequence(found,numericTokens(text));
   return found;
@@ -1076,9 +1112,23 @@ async function runSampleOcr(i){
     const fullValues=parseLaudoText(fullText);
 
     setOcrUi(i,'Conferindo a coluna de valores…',48);
-    const numberImage=await prepareNumberColumn(source);
+    const numberImage=await prepareNumberColumn(source,'full');
     await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'0123456789.,',preserve_interword_spaces:'1'});
-    const numberResult=await worker.recognize(numberImage),numberText=numberResult.data.text||'',numberValues=numericTokens(numberText);
+    let numberResult=await worker.recognize(numberImage),numberText=`--- RECORTE COMPLETO ---\n${numberResult.data.text||''}`,numberValues=numericTokens(numberResult.data.text||''),numberSequence=reportSequence(numberValues),numberConfidence=numberResult.data.confidence||0;
+    if(!numberSequence){
+      setOcrUi(i,'Ajustando o enquadramento da coluna…',54);
+      const wideResult=await worker.recognize(await prepareNumberColumn(source,'wide')),wideText=wideResult.data.text||'',wideValues=numericTokens(wideText),wideSequence=reportSequence(wideValues);
+      numberText+=`\n--- RECORTE AMPLO ---\n${wideText}`;numberConfidence=Math.max(numberConfidence,wideResult.data.confidence||0);
+      if(wideSequence){numberValues=wideValues;numberSequence=wideSequence;numberResult=wideResult;}
+      else if(wideValues.length>numberValues.length)numberValues=wideValues;
+    }
+    if(!numberSequence){
+      setOcrUi(i,'Aplicando o enquadramento alternativo…',61);
+      const legacyResult=await worker.recognize(await prepareNumberColumn(source,'legacy')),legacyText=legacyResult.data.text||'',legacyValues=numericTokens(legacyText),legacySequence=reportSequence(legacyValues);
+      numberText+=`\n--- RECORTE ALTERNATIVO ---\n${legacyText}`;numberConfidence=Math.max(numberConfidence,legacyResult.data.confidence||0);
+      if(legacySequence){numberValues=legacyValues;numberSequence=legacySequence;numberResult=legacyResult;}
+      else if(legacyValues.length>numberValues.length)numberValues=legacyValues;
+    }
 
     setOcrUi(i,'Verificando a lista de elementos…',68);
     const labelImage=await prepareLabelColumn(source);
@@ -1087,7 +1137,8 @@ async function runSampleOcr(i){
     const labelMap=mapLabelsToValues(parseLabelColumn(labelText),numberValues);
     newlyAdded=registerElements(Object.keys(labelMap));
     await syncElementsToCloud(newlyAdded);
-    let merged={...fullValues,...mergeReportSequence({...fullValues},numberValues),...labelMap};
+    let merged={...fullValues,...labelMap};
+    if(numberSequence)REPORT_ORDER.forEach((el,index)=>{merged[el]=numberSequence[index]});
 
     if(Object.keys(merged).length<REPORT_ORDER.length){
       setOcrUi(i,'Aplicando leitura de compatibilidade…',78);
@@ -1095,7 +1146,7 @@ async function runSampleOcr(i){
       await worker.setParameters({tessedit_pageseg_mode:'6',tessedit_char_whitelist:'',preserve_interword_spaces:'1'});
       fallbackResult=await worker.recognize(fullPageImage);fallbackText=fallbackResult.data.text||'';
       const fallbackValues=parseLaudoText(fallbackText);
-      if(plausibleChemicalMap(fallbackValues))merged={...merged,...fallbackValues};
+      if(plausibleChemicalMap(fallbackValues))merged={...fallbackValues,...merged};
     }
 
     setOcrUi(i,'Lendo código, data e turno…',82);
@@ -1115,7 +1166,7 @@ async function runSampleOcr(i){
     sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
     const complete=fields.length===INP.length;
     const headerOk=meta.date&&meta.code&&meta.turno;
-    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberResult.data.confidence||0,codeResult.data.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
+    sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberConfidence,codeResult.data.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
   }catch(err){sample.ocr={state:'error',message:err.message||'Não foi possível ler o laudo.',progress:0,found:0,text:rawText};}
   finally{activeOcrSample=-1;renderFotos();}
   if(newlyAdded.length)alert(`⚠ Novo${newlyAdded.length>1?'s elementos detectados':' elemento detectado'}: ${newlyAdded.join(', ')}.\n\n${newlyAdded.length>1?'Os campos foram incluídos':'O campo foi incluído'} em todo o sistema. As análises anteriores receberam valor zero.`);
