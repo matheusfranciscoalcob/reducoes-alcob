@@ -173,6 +173,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',system-ui,sans-serif;b
 /* Archived runs */
 .archive-section{margin-top:16px;padding-top:12px;border-top:1px solid var(--bd)}
 .archive-section h3{font-size:.7rem;font-weight:700;margin-bottom:8px;color:var(--t2)}
+.archive-rules{font-size:.48rem;color:var(--tm);margin:-4px 0 8px}
 .archive-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
 .arc-card{background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:8px 10px;cursor:pointer;transition:all .12s}
 .arc-card:hover{border-color:var(--ac)}
@@ -180,6 +181,14 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',system-ui,sans-serif;b
 .arc-card .arc-code{font-size:.65rem;font-weight:700}
 .arc-card .arc-meta{font-size:.5rem;color:var(--tm);margin-top:2px}
 .arc-card .arc-cu{font-family:'JetBrains Mono',monospace;font-size:.7rem;font-weight:700;color:var(--sc);margin-top:3px}
+.arc-quality{display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap}
+.arc-quality .arc-cu{margin-top:0}
+.material-badge{display:inline-flex;align-items:center;justify-content:center;min-width:54px;padding:3px 7px;border-radius:99px;font-size:.48rem;font-weight:800;border:1px solid transparent}
+.material-badge.class-a{color:oklch(35% .1 145);background:oklch(94% .035 145);border-color:oklch(78% .08 145)}
+.material-badge.class-b{color:oklch(38% .12 250);background:oklch(94% .035 250);border-color:oklch(78% .08 250)}
+.material-badge.class-c{color:oklch(38% .1 80);background:oklch(95% .055 90);border-color:oklch(80% .1 90)}
+.material-badge.outside{color:var(--dn);background:oklch(96% .025 25);border-color:oklch(82% .07 25)}
+.analytics-empty{padding:14px;border:1px dashed var(--bd);border-radius:6px;color:var(--tm);font-size:.58rem;background:var(--bg)}
 .arc-top{display:flex;align-items:flex-start;gap:8px}
 .arc-main{min-width:0;flex:1}
 .arc-thumb{width:42px;height:52px;object-fit:cover;border-radius:4px;border:1px solid var(--bd);background:var(--sf)}
@@ -345,7 +354,8 @@ tr:hover td{background:oklch(96% .006 145/.3)}
       </div>
       <div class="samples-grid" id="sGrid"></div>
       <div class="archive-section">
-        <h3>📁 Corridas Arquivadas (<span id="arcCount">0</span>)</h3>
+        <h3>📁 Corridas Salvas (<span id="arcCount">0</span>)</h3>
+        <p class="archive-rules">Classificação pelo Cu+Ag: A 99,90–99,99% · B 99,45–99,89% · C 98,82–99,44%</p>
         <div class="archive-list" id="arcList"></div>
       </div>
     </div>
@@ -466,10 +476,45 @@ let INP=[...REPORT_ORDER];
 // LIMITES ATUALIZADOS
 const LM={Pb:.0550,Zn:.0050,Sn:.0050,Ni:.0100,Fe:.0020,Sb:.0005,S:.0005,P:.0005,Si:.0005,Al:.0005,Cr:.0005,Ag:.0005,Bi:.0005};
 
+// Cu+Ag é uma propriedade derivada do laudo: cobre-base + prata.
+// A regra fica centralizada aqui para arquivo, planilha, gráficos e dashboard.
+function canonicalCuAg(data){
+  if(!data||typeof data!=='object')return null;
+  const hasBase=Object.prototype.hasOwnProperty.call(data,'Base (Cu)'),hasAg=Object.prototype.hasOwnProperty.call(data,'Ag');
+  const base=Number(data['Base (Cu)']),ag=Number(data.Ag),reported=Number(data['Cu+Ag']);
+  if(hasBase&&hasAg&&Number.isFinite(base)&&base>=98&&base<=100&&Number.isFinite(ag)&&ag>=0&&ag<2){
+    const calculated=Number((base+ag).toFixed(6));
+    return calculated<=100?calculated:null;
+  }
+  return Number.isFinite(reported)&&reported>=98&&reported<=100?reported:null;
+}
+function normalizeChemicalData(data){
+  const normalized={...(data||{})},cuAg=canonicalCuAg(normalized);
+  if(cuAg!==null)normalized['Cu+Ag']=cuAg;
+  return normalized;
+}
+function classifyMaterial(cuAg){
+  const value=Number(cuAg);
+  if(!Number.isFinite(value))return{code:'—',label:'Fora da faixa',css:'outside'};
+  const rounded=Math.round((value+Number.EPSILON)*100)/100;
+  if(rounded>=99.90&&rounded<=99.99)return{code:'A',label:'Classe A',css:'class-a'};
+  if(rounded>=99.45&&rounded<=99.89)return{code:'B',label:'Classe B',css:'class-b'};
+  if(rounded>=98.82&&rounded<=99.44)return{code:'C',label:'Classe C',css:'class-c'};
+  return{code:'—',label:'Fora da faixa',css:'outside'};
+}
+function finalMaterial(run){
+  const samples=[...(run?.samples||[])].reverse();
+  for(const sample of samples){
+    const cuAg=canonicalCuAg(sample?.data);
+    if(cuAg!==null)return{cuAg,classification:classifyMaterial(cuAg),sample};
+  }
+  return{cuAg:null,classification:classifyMaterial(null),sample:null};
+}
+
 // STORE
 let archive=[];
 let current={date:new Date().toISOString().split('T')[0],code:'',turno:'A (06-14h)',samples:[{photo:null,data:{}}]};
-let viewId=null; // null = edição; demais valores representam um grupo operacional.
+let viewId=null; // null = ainda não há corrida salva selecionada.
 
 const MONTH_NAMES=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 function dateParts(date){
@@ -716,11 +761,12 @@ async function loadCloudData(){
           if(!signed.error)photo=signed.data?.signedUrl||null;
         }
         const chemical={};INP.forEach(el=>chemical[el]=Number(sample.chemical_data?.[el]??0));
-        return {id:sample.id,sampleOrder:sample.sample_order,photo,photoPath:sample.photo_path,photoName:sample.photo_name,data:chemical,analysisCode:sample.analysis_code,analysisType:sample.analysis_type,codeYear:sample.code_year,codeMonth:sample.code_month,codeDay:sample.code_day,furnaceNumber:sample.furnace_number,heatNumber:sample.heat_number,furnaceOperatorCode:sample.furnace_operator_code,labAnalystCode:sample.lab_analyst_code,analysisSequence:sample.analysis_sequence,jumboNumber:sample.jumbo_number,createdAt:sample.created_at,ocr:{state:'done',found:Object.keys(sample.chemical_data||{}).length,confidence:Number(sample.ocr_confidence||0)}};
+        const normalizedChemical=normalizeChemicalData(chemical);
+        return {id:sample.id,sampleOrder:sample.sample_order,photo,photoPath:sample.photo_path,photoName:sample.photo_name,data:normalizedChemical,analysisCode:sample.analysis_code,analysisType:sample.analysis_type,codeYear:sample.code_year,codeMonth:sample.code_month,codeDay:sample.code_day,furnaceNumber:sample.furnace_number,heatNumber:sample.heat_number,furnaceOperatorCode:sample.furnace_operator_code,labAnalystCode:sample.lab_analyst_code,analysisSequence:sample.analysis_sequence,jumboNumber:sample.jumbo_number,createdAt:sample.created_at,ocr:{state:'done',found:Object.keys(sample.chemical_data||{}).length,confidence:Number(sample.ocr_confidence||0)}};
       }));
       return {id:run.id,code:run.code,date:run.run_date,turno:run.shift,createdAt:run.created_at,samples};
     }));
-    if(viewId&&!groupedArchive().some(group=>group.id===viewId)&&!archive.some(run=>run.id===viewId))viewId=null;
+    if(viewId&&!groupedArchive().some(group=>group.id===viewId))viewId=null;
     uS();const tab=at();if(tab==='fotos')renderFotos();else{dc();rT(tab);}
     setSyncPill('sincronizado');
   }catch(err){console.error(err);setSyncPill('falha ao sincronizar',true);alert('Não foi possível carregar o histórico: '+(err.message||err));}
@@ -743,11 +789,12 @@ function go(t){
   if(t==='fotos')renderFotos();else{dc();rT(t);}
 }
 function at(){return document.querySelector('.tb.on').dataset.t}
-function sw(v){viewId=v==='__draft__'?null:v;const t=at();if(t==='fotos')renderFotos();else{dc();rT(t);}}
+function sw(v){viewId=v||null;const t=at();if(t==='fotos')renderFotos();else{dc();rT(t);}}
 
 function getActive(){
-  if(viewId){const grouped=groupedArchive().find(group=>group.id===viewId);if(grouped)return grouped;const a=archive.find(r=>r.id===viewId);return a||null;}
-  return current;
+  const saved=groupedArchive();
+  if(!saved.length)return null;
+  return saved.find(group=>group.id===viewId)||saved[0];
 }
 
 let CH=[];function dc(){CH.forEach(c=>c.destroy());CH=[];}
@@ -763,6 +810,7 @@ function analysisLabels(run){
 }
 function updateViewContext(tab,run){
   const box=document.getElementById('ctx-'+tab);if(!box)return;
+  if(!run){box.innerHTML='<strong>Nenhuma corrida salva</strong><span>Salve uma corrida para alimentar esta tela.</span>';return;}
   const first=run?.samples?.[0],meta=first?.meta||parseAnalysisCode(first?.analysisCode||run?.code,first?.runDate||run?.date||current.date),group=run?.group||analysisGroup(meta,run?.id||'draft');
   const type=group.type==='jumbo_monitoring'?'Monitoramento de jumbo':group.type==='standard'?'Fornada':'Código não classificado';
   box.innerHTML=`<strong>${esc(group.label)}</strong><span>${type}</span><span>${run?.samples?.length||0} análise${(run?.samples?.length||0)===1?'':'s'}</span>`;
@@ -771,11 +819,14 @@ function fv(v){return v>=.01?v.toFixed(4):v.toFixed(5)}
 
 function uS(){
   const sel=document.getElementById('sel');
-  let opts='<option value="__draft__">📝 Corrida em edição</option>';
-  groupedArchive().forEach(group=>{opts+=`<option value="${group.id}"${viewId===group.id?' selected':''}>${group.group.type==='jumbo_monitoring'?'🔎':'🔥'} ${esc(group.group.label)} (${group.samples.length})</option>`;});
+  const saved=groupedArchive();
+  if(saved.length&&!saved.some(group=>group.id===viewId))viewId=saved[0].id;
+  if(!saved.length)viewId=null;
+  let opts=saved.length?'':'<option value="" selected>Nenhuma corrida salva</option>';
+  saved.forEach(group=>{opts+=`<option value="${group.id}"${viewId===group.id?' selected':''}>${group.group.type==='jumbo_monitoring'?'🔎':'🔥'} ${esc(group.group.label)} (${group.samples.length})</option>`;});
   sel.innerHTML=opts;
-  if(!viewId)sel.value='__draft__';
-  document.getElementById('histCount').textContent=archive.length+' arquivadas';
+  sel.disabled=!saved.length;
+  document.getElementById('histCount').textContent=archive.length+' salvas';
 }
 
 // === FOTOS ===
@@ -808,15 +859,15 @@ function renderFotos(){
   // Archive list
   document.getElementById('arcCount').textContent=archive.length;
   const al=document.getElementById('arcList');al.innerHTML='';
-  archive.slice().reverse().forEach(r=>{
-    const cu=r.samples[r.samples.length-1]?.data?.['Base (Cu)']||0;
+  archive.forEach(r=>{
+    const material=finalMaterial(r),cuAgText=material.cuAg===null?'—':material.cuAg.toFixed(4)+'%';
     const photos=r.samples.filter(s=>s.photo);
     const firstPhoto=photos[0]?.photo;
     const firstMeta=r.samples[0]?rowAnalysisMeta(r.samples[0],r):parseAnalysisCode(r.code,r.date),group=analysisGroup(firstMeta,r.id);
     al.innerHTML+=`<div class="arc-card${viewId===group.key?' sel':''}" onclick="sw('${group.key}');uS();">
       <div class="arc-top"><div class="arc-main"><div class="arc-code">${esc(r.code)}</div>
       <div class="arc-meta">${esc(group.label)} • ${esc(r.date)} • ${r.samples.length} amostras</div>
-      <div class="arc-cu">Cu: ${cu.toFixed(4)}%</div></div>
+      <div class="arc-quality"><span class="material-badge ${material.classification.css}" title="Classificação pelo Cu+Ag">${material.classification.label}</span><span class="arc-cu">Cu+Ag: ${cuAgText}</span></div></div>
       ${firstPhoto?`<img class="arc-thumb" src="${firstPhoto}" alt="Miniatura do laudo" onclick="openRunPhotos('${r.id}',event)">`:''}</div>
       <div class="arc-actions">
         ${photos.length?`<button class="arc-attach" type="button" onclick="openRunPhotos('${r.id}',event)">📎 ${photos.length} laudo${photos.length>1?'s':''} anexado${photos.length>1?'s':''}</button>`:'<span class="arc-meta">Sem foto anexada</span>'}
@@ -849,7 +900,9 @@ function parseChemicalValue(v){const n=parseFloat(String(v).trim().replace('%','
 function uV(i,el,v){
   if(!current.samples[i].data)current.samples[i].data={};
   current.samples[i].data[el]=parseChemicalValue(v);
+  current.samples[i].data=normalizeChemicalData(current.samples[i].data);
   current.samples[i].autoFields=(current.samples[i].autoFields||[]).filter(x=>x!==el);
+  if(el==='Base (Cu)'||el==='Ag'||el==='Cu+Ag')renderFotos();
 }
 function addSample(){current.samples.push({photo:null,data:{}});renderFotos();}
 function delS(i){if(current.samples.length<=1)return;current.samples.splice(i,1);renderFotos();}
@@ -1225,10 +1278,11 @@ async function runSampleOcr(i){
     }
     applyHeaderMeta(meta,sample);sample.meta={...(sample.meta||{}),...meta};
 
-    const values=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]])),fields=Object.keys(values);
+    const parsedValues=Object.fromEntries(INP.filter(el=>Number.isFinite(merged[el])).map(el=>[el,merged[el]]));
+    const values=normalizeChemicalData(parsedValues),fields=Object.keys(values);
     rawText=`--- LAUDO COMPLETO ---\n${fullText}\n\n--- COLUNA NUMÉRICA ---\n${numberText}\n\n--- ELEMENTOS ---\n${labelText}\n\n--- CÓDIGO ---\n${codeText}\n\n--- CÓDIGO NA PÁGINA INTEIRA ---\n${codePageText}\n\n--- LEITURA DE COMPATIBILIDADE ---\n${fallbackText}\n\n--- CABEÇALHO ---\n${headerText}\n\n--- DATA/HORA ---\n${timestampText}`;
     if(fields.length<2)throw new Error(`O OCR não localizou a tabela química (${fields.length}/${INP.length}). A imagem foi processada nos modos recortado e página inteira.`);
-    sample.data={...(sample.data||{}),...values};sample.autoFields=fields;
+    sample.data=normalizeChemicalData({...(sample.data||{}),...values});sample.autoFields=fields;
     const complete=fields.length===INP.length;
     const headerOk=meta.date&&meta.code&&meta.turno;
     sample.ocr={state:'done',message:complete&&headerOk?'✓ Elementos e cabeçalho preenchidos — confira':complete?'⚠ Elementos lidos; confira data, turno e código':`⚠ Leitura parcial (${fields.length}/${INP.length}) — complete e confira`,progress:100,found:fields.length,confidence:Math.round(Math.max(fullResult.data.confidence||0,numberConfidence,codeResult.data.confidence||0,codePageResult?.data?.confidence||0,fallbackResult?.data?.confidence||0)),text:rawText};
@@ -1286,7 +1340,8 @@ async function saveAndClear(){
         const upload=await supabaseClient.storage.from('lab-reports').upload(photoPath,blob,{contentType:'image/jpeg',upsert:false});
         if(upload.error)throw upload.error;uploadedPaths.push(photoPath);
       }
-      const chemicalData={};INP.forEach(el=>chemicalData[el]=Number(sample.data?.[el]??0));
+      let chemicalData={};INP.forEach(el=>chemicalData[el]=Number(sample.data?.[el]??0));
+      chemicalData=normalizeChemicalData(chemicalData);
       const sampleCode=sample.analysisCode||code;
       const parsedMeta=sample.meta?.analysisType&&sample.meta.analysisType!=='unclassified'?{...sample.meta,date:sample.meta.date||date,code:sampleCode}:parseAnalysisCode(sampleCode,date);
       const group=analysisGroup(parsedMeta,runId);if(!savedGroupId&&group.type!=='unclassified')savedGroupId=group.key;
@@ -1308,9 +1363,26 @@ async function saveAndClear(){
 }
 
 // === BUILD ===
-function bd(r){if(!r||!r.samples)return null;const d={};INP.forEach(el=>{d[el]=r.samples.map(s=>s.data&&s.data[el]?s.data[el]:0)});return{...r,n:r.samples.length,d};}
+function bd(r){
+  if(!r||!r.samples)return null;
+  const normalizedSamples=r.samples.map(sample=>({...sample,data:normalizeChemicalData(sample.data)})),d={};
+  INP.forEach(el=>{d[el]=normalizedSamples.map(s=>Number(s.data?.[el]??0))});
+  return{...r,samples:normalizedSamples,n:normalizedSamples.length,d};
+}
 
-function rT(t){const r=getActive();updateViewContext(t,r);const b=bd(r);if(!b||!b.d['Base (Cu)']||b.n<1)return;({planilha:rP,reducoes:rR,graficos:rG,dashboard:rD})[t](b);}
+function clearAnalytics(tab){
+  if(tab==='planilha'){
+    document.getElementById('mP').innerHTML='<div class="analytics-empty">Nenhuma corrida salva para exibir.</div>';
+    document.getElementById('thP').innerHTML='';document.getElementById('tbP').innerHTML='';
+  }else if(tab==='reducoes'){
+    document.getElementById('thR').innerHTML='';document.getElementById('tbR').innerHTML='';
+  }else if(tab==='dashboard'){
+    document.getElementById('mD').innerHTML='<div class="analytics-empty">Nenhuma corrida salva para exibir.</div>';
+    document.getElementById('vilaoList').innerHTML='';document.getElementById('redList').innerHTML='';document.getElementById('compDiv').innerHTML='';
+  }
+}
+
+function rT(t){const r=getActive();updateViewContext(t,r);const b=bd(r);if(!b||!b.d['Base (Cu)']||b.n<1){clearAnalytics(t);return;}({planilha:rP,reducoes:rR,graficos:rG,dashboard:rD})[t](b);}
 
 function rP(r){
   const{n,d}=r,L=analysisLabels(r),cu=d['Base (Cu)'];
@@ -1349,12 +1421,13 @@ function rG(r){
 }
 
 function rD(r){
-  const{n,d}=r,L=analysisLabels(r),cu=d['Base (Cu)'];
+  const{n,d}=r,L=analysisLabels(r),cuAg=d['Cu+Ag'];
+  const materialClass=classifyMaterial(cuAg[n-1]);
   const fR=d.Fe&&d.Fe[0]?((d.Fe[0]-d.Fe[n-1])/d.Fe[0]*100):0;
   const aR=d.Al&&d.Al[0]?((d.Al[0]-d.Al[n-1])/d.Al[0]*100):0;
   const sR2=d.Sn&&d.Sn[0]?((d.Sn[0]-d.Sn[n-1])/d.Sn[0]*100):0;
   document.getElementById('mD').innerHTML=`
-    <div class="mc"><div class="lb">Cu Final</div><div class="vl" style="color:var(--sc)">${cu[n-1].toFixed(3)}%</div><div class="sb su">${cu[n-1]>=99.9?'≥99.9%':'<99.9%'}</div></div>
+    <div class="mc"><div class="lb">Cu+Ag Final</div><div class="vl" style="color:var(--sc)">${cuAg[n-1].toFixed(4)}%</div><div class="sb su">${materialClass.label}</div></div>
     <div class="mc"><div class="lb">Red. Fe</div><div class="vl" style="color:var(--ac)">${fR.toFixed(1)}%</div><div class="sb su">${d.Fe?d.Fe[0].toFixed(4)+'→'+d.Fe[n-1].toFixed(4):''}</div></div>
     <div class="mc"><div class="lb">Red. Al</div><div class="vl" style="color:var(--ac)">${aR.toFixed(1)}%</div><div class="sb su">${d.Al?d.Al[0].toFixed(3)+'→'+d.Al[n-1].toFixed(5):''}</div></div>
     <div class="mc"><div class="lb">Red. Sn</div><div class="vl" style="color:var(--ac)">${sR2.toFixed(1)}%</div><div class="sb su">${d.Sn?d.Sn[0].toFixed(4)+'→'+d.Sn[n-1].toFixed(4):''}</div></div>`;
@@ -1412,7 +1485,7 @@ function rD(r){
   let compH='<div class="comp-hdr"><span>Elem</span><span style="text-align:right">1ª Am.</span><span></span><span style="text-align:right">Última</span></div>';
   compEls.forEach(el=>{
     const v1=d[el]?d[el][0]:0;const vL2=d[el]?d[el][n-1]:0;
-    const isCu=el==='Base (Cu)';
+    const isCu=el==='Base (Cu)'||el==='Cu+Ag';
     const better=isCu?(vL2>v1):(vL2<v1);
     const arr=isCu?(better?'<span style="color:var(--sc)">▲</span>':'<span style="color:var(--dn)">▼</span>'):(better?'<span style="color:var(--sc)">▼</span>':'<span style="color:var(--dn)">▲</span>');
     compH+=`<div class="comp-row"><span class="cel">${el.replace('Base (Cu)','Cu%')}</span><span class="cv">${v1>0?fv(v1):'-'}</span>${arr}<span class="cv" style="font-weight:600;color:${better?'var(--sc)':'var(--dn)'}">${vL2>0?fv(vL2):'-'}</span></div>`;
