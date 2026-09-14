@@ -604,6 +604,9 @@ function registerElements(names){
 
 const APPROVER_EMAIL='matheusferfran2010@gmail.com';
 const SITE_URL='https://matheusfranciscoalcob.github.io/reducoes-alcob/';
+// Isola a autenticação deste aplicativo dos outros sites publicados no mesmo domínio.
+// O localStorage é compartilhado por origem (domínio), não por diretório.
+const AUTH_STORAGE_KEY='reducoes-alcob-auth-v1';
 let supabaseClient=null,authUser=null,activeAccessToken,accessProfile=null,approvalRows=[];
 
 function setCloudLoading(on,message='Sincronizando dados com o servidor…'){
@@ -625,7 +628,12 @@ async function initCloud(){
     showAuthMessage('A conexão com o banco ainda não foi configurada.',true);setSyncPill('sem conexão',true);return;
   }
   supabaseClient=window.supabase.createClient(cfg.supabaseUrl,cfg.supabasePublishableKey,{
-    auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}
+    auth:{
+      storageKey:AUTH_STORAGE_KEY,
+      persistSession:true,
+      autoRefreshToken:true,
+      detectSessionInUrl:true
+    }
   });
   const {data,error}=await supabaseClient.auth.getSession();
   if(error){showAuthMessage(error.message,true);setSyncPill('erro',true);return;}
