@@ -105,7 +105,7 @@ html,body{height:100%;overflow:hidden;font-family:'Inter',system-ui,sans-serif;b
 .hist-count{font-size:.55rem;font-weight:600;color:var(--tm)}
 .ocr-badge{font-size:.5rem;font-weight:700;padding:3px 6px;border-radius:4px;background:oklch(94% .025 250);color:oklch(45% .12 250)}
 .cloud-user{font-size:.5rem;color:var(--tm);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.btn-logout{padding:3px 7px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);font-size:.48rem;font-weight:600;color:var(--t2);cursor:pointer}
+.btn-logout{padding:3px 7px;border:1px solid var(--bd);border-radius:4px;background:var(--bg);font-size:.48rem;font-weight:600;color:var(--t2);cursor:pointer;text-decoration:none}
 .sync-pill{font-size:.48rem;font-weight:700;color:var(--sc)}
 .sync-pill.err{color:var(--dn)}
 .tabs{display:flex;gap:2px;padding:5px 18px;background:oklch(94% .005 55);border-bottom:1px solid var(--bd)}
@@ -325,6 +325,7 @@ tr:hover td{background:oklch(96% .006 145/.3)}
       <span class="hist-count" id="histCount"></span>
       <span class="sync-pill" id="syncPill">offline</span>
       <span class="cloud-user" id="cloudUser"></span>
+      <a class="btn-logout" href="controle-solucoes/">Controle de soluções</a>
       <button class="btn-logout" id="approvalsBtn" type="button" onclick="openApprovals()" style="display:none">Solicitações <span id="approvalCount"></span></button>
       <button class="btn-logout" id="logoutBtn" type="button" onclick="signOutUser()">Sair</button>
     </div>

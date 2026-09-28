@@ -1,0 +1,55 @@
+CONTROLE DE SOLUÇÕES — APLICAÇÃO ONLINE
+
+1. Acesse o módulo “Controle de soluções” no projeto Reduções ALCOB.
+2. Entre com uma conta aprovada do projeto.
+3. Preencha as duas alturas e a concentração atual.
+4. Use “Registrar medição” para guardar o resultado no histórico compartilhado.
+5. O histórico, as análises e as fotografias são sincronizados pelo Supabase. O backup continua disponível para exportação de segurança.
+
+CALIBRAÇÃO ADAPTATIVA
+- Depois de corrigir e homogeneizar, abra o Histórico e clique em “Validar resultado”.
+- Informe o óleo realmente adicionado e a concentração medida depois da homogeneização.
+- O sistema infere o volume observado e ajusta gradualmente os próximos cálculos.
+- Não valide uma amostra se houve retirada de solução ou adição de água entre as medições.
+- O painel informa quantas validações existem e o nível de confiança do ajuste.
+
+PARÂMETROS PROTEGIDOS
+- Senha de acesso aos parâmetros técnicos: processo
+- A senha é um bloqueio operacional da interface; o acesso aos dados também exige login e aprovação.
+
+O site é publicado no GitHub Pages dentro do repositório `reducoes-alcob`. Os dados ficam no projeto Supabase `reducoes-alcob`, separado do sistema de auditorias, com RLS e bucket privado.
+
+Parâmetros iniciais:
+- Tanque subterrâneo: 1,90 × 1,80 × 1,10 m; 34,2 L/cm.
+- Caixa: 20.000 L aos 321 cm, aproximada por tronco de cone normalizado.
+- Faixa operacional: 2,50% a 3,00%.
+- Alvo padrão: 2,50%.
+- A correção com água só aparece acima de 3,00% e calcula a diluição até 3,00%.
+
+MÓDULO DE DECAPAGEM
+- Cálculo, histórico, parâmetros e aprendizado separados do óleo solúvel.
+- Faixa operacional: 2,50% a 3,50%; alvo inicial configurado em 3,00%.
+- Caixa 1: cotas úteis do desenho de 3.384 × 2.384 × 3.000 mm.
+- Capacidade útil da caixa 1: 24.202,752 L, arredondada para 24.203 L; 80,67456 L/cm.
+- Caixa 2: 3,00 × 1,80 × 1,10 m; 5.940 L; 54 L/cm.
+- Abaixo da faixa, calcula álcool para atingir o alvo configurado.
+- Dentro da faixa, não recomenda adição.
+- Acima de 3,50%, mostra opcionalmente água para retornar a 3,50%.
+- A validação pós-correção usa o álcool realmente adicionado e a concentração posterior.
+
+ANÁLISES E FOTOGRAFIAS
+- No histórico de óleo solúvel, use “Completar análise” para informar pH, alcalinidade e sujidade.
+- No histórico de decapagem, use “Completar análise” para informar o pH.
+- Use “+ Foto” na própria linha para anexar uma ou várias fotografias à amostra.
+- As fotografias são comprimidas no navegador, enviadas a um bucket privado e mantidas em cache local para uso na tela e no relatório.
+- O novo backup “com fotos” inclui registros, análises e fotografias.
+
+RELATÓRIO PDF
+- Abra o histórico do sistema desejado.
+- Informe a data inicial e a data final.
+- Clique em “Gerar relatório PDF”.
+- O navegador abrirá o relatório com os dados e fotografias de cada amostra.
+- Na janela de impressão, escolha “Salvar como PDF” ou a impressora PDF disponível no computador.
+- Talvez seja necessário permitir pop-ups para o arquivo local.
+
+Valide parâmetros, compatibilidade química e procedimento com o responsável técnico antes do uso operacional.

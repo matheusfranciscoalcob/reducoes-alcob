@@ -1,0 +1,7 @@
+[hidden]{display:none!important}
+.system-switch{display:inline-flex;gap:4px;margin-top:18px;padding:4px;border:1px solid #bdcec8;border-radius:11px;background:#dce9e5}
+.system-switch button{min-width:145px;height:36px;border:0;border-radius:8px;background:transparent;color:#58706a;font-size:12px;font-weight:800;cursor:pointer}
+.system-switch button.active{background:#fff;color:var(--teal);box-shadow:0 3px 10px #24483e20}
+.pickling-dose{background:linear-gradient(145deg,#6d4e08,#493504)}
+.pickling-dose .flask,.pickling-dose>strong,.pickling-dose>div:last-child b{color:#fff0a7}
+@media(max-width:620px){.system-switch{display:flex}.system-switch button{min-width:0;flex:1}}
