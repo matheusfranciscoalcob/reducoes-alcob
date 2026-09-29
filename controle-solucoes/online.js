@@ -168,7 +168,7 @@ async function openApplication(){
     gate.innerHTML='<div class="cloud-card"><h1>Preparando o sistema</h1><p>Carregando histórico, análises e fotografias compartilhadas...</p></div>';
     await hydrateState();await hydrateMedia();installBridge();
     window.CloudSync={saveAnnotation,savePhoto,deletePhoto:deleteCloudPhoto};
-    if(!scriptsLoaded){await loadScript('calculos.js?v=20260929-edit');await loadScript('aplicacao.js?v=20260929-edit');await loadScript('midia-relatorios.js?v=20260929-edit');scriptsLoaded=true}
+    if(!scriptsLoaded){await loadScript('calculos.js?v=20260929-full-edit');await loadScript('aplicacao.js?v=20260929-full-edit');await loadScript('midia-relatorios.js?v=20260929-full-edit');scriptsLoaded=true}
     document.body.classList.remove('cloud-locked');gate.innerHTML='';setStatus('Sincronizado');
     document.getElementById('logoutCloud').onclick=signOut;
   }catch(err){console.error(err);showLogin('Não foi possível carregar os dados compartilhados: '+(err.message||err),true)}
