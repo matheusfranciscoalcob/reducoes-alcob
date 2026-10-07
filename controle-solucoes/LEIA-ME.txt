@@ -28,13 +28,13 @@ Parâmetros iniciais:
 
 MÓDULO DE DECAPAGEM
 - Cálculo, histórico, parâmetros e aprendizado separados do óleo solúvel.
-- Faixa operacional: 2,50% a 3,50%; alvo inicial configurado em 3,00%.
+- Faixa operacional: 4,50% a 5,50%; referência configurada em 5,00%.
 - Caixa 1: cotas úteis do desenho de 3.384 × 2.384 × 3.000 mm.
 - Capacidade útil da caixa 1: 24.202,752 L, arredondada para 24.203 L; 80,67456 L/cm.
 - Caixa 2: 3,00 × 1,80 × 1,10 m; 5.940 L; 54 L/cm.
 - Abaixo da faixa, calcula álcool para atingir o alvo configurado.
 - Dentro da faixa, não recomenda adição.
-- Acima de 3,50%, mostra opcionalmente água para retornar a 3,50%.
+- Acima de 5,50%, mostra opcionalmente água para retornar a 5,50%.
 - A validação pós-correção usa o álcool realmente adicionado e a concentração posterior.
 
 ANÁLISES E FOTOGRAFIAS

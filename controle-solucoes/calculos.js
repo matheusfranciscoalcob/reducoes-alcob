@@ -9,7 +9,7 @@
   const DEFAULT_PICKLING_CONFIG = {
     tank1LengthM: 4, tank1WidthM: 3, tank1HeightCm: 300, tank1CapacityLiters: 24203,
     tank2LengthM: 3, tank2WidthM: 1.8, tank2HeightCm: 110,
-    minConcentrationPct: 2.5, maxConcentrationPct: 3.5
+    minConcentrationPct: 4.5, maxConcentrationPct: 5.5
   };
   function calculateTankVolume(heightCm, c = DEFAULT_CONFIG) {
     return c.tankLengthM * c.tankWidthM * (heightCm / 100) * 1000;
@@ -86,7 +86,7 @@
     if (i.tank1HeightCm < 0 || i.tank1HeightCm > c.tank1HeightCm) e.push(`A altura da caixa 1 deve ficar entre 0 e ${c.tank1HeightCm} cm.`);
     if (i.tank2HeightCm < 0 || i.tank2HeightCm > c.tank2HeightCm) e.push(`A altura da caixa 2 deve ficar entre 0 e ${c.tank2HeightCm} cm.`);
     if (i.currentConcentrationPct < 0 || i.currentConcentrationPct > 100) e.push('A concentração atual deve ficar entre 0% e 100%.');
-    if (i.targetConcentrationPct <= 0 || i.targetConcentrationPct >= 100) e.push('A concentração-alvo deve ficar entre 0% e 100%.');
+    if (i.targetConcentrationPct < c.minConcentrationPct || i.targetConcentrationPct > c.maxConcentrationPct) e.push(`A concentração-alvo deve ficar entre ${c.minConcentrationPct}% e ${c.maxConcentrationPct}%.`);
     return e;
   }
   function calculatePicklingAll(i, c = DEFAULT_PICKLING_CONFIG, calibrationFactor = 1) {
