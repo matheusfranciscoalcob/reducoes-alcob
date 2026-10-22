@@ -2,7 +2,7 @@ CONTROLE DE SOLUÇÕES — APLICAÇÃO ONLINE
 
 1. Acesse o módulo “Controle de soluções” no projeto Reduções ALCOB.
 2. Entre com uma conta aprovada do projeto.
-3. Preencha as duas alturas e a concentração atual.
+3. Preencha a concentração atual. As duas alturas só são obrigatórias quando houver correção.
 4. Use “Registrar medição” para guardar o resultado no histórico compartilhado.
 5. O histórico, as análises e as fotografias são sincronizados pelo Supabase. O backup continua disponível para exportação de segurança.
 
@@ -25,6 +25,7 @@ Parâmetros iniciais:
 - Faixa operacional: 2,50% a 3,00%.
 - Alvo padrão: 2,50%.
 - A correção com água só aparece acima de 3,00% e calcula a diluição até 3,00%.
+- Dentro da faixa, a amostra pode ser registrada sem alturas, sem volume calculado e sem validação pós-correção.
 
 MÓDULO DE DECAPAGEM
 - Cálculo, histórico, parâmetros e aprendizado separados do óleo solúvel.
@@ -34,6 +35,7 @@ MÓDULO DE DECAPAGEM
 - Caixa 2: 3,00 × 1,80 × 1,10 m; 5.940 L; 54 L/cm.
 - Abaixo da faixa, calcula álcool para atingir o alvo configurado.
 - Dentro da faixa, não recomenda adição.
+- Dentro da faixa, permite registrar a amostra sem alturas e não solicita validação.
 - Acima de 5,50%, mostra opcionalmente água para retornar a 5,50%.
 - A validação pós-correção usa o álcool realmente adicionado e a concentração posterior.
 
