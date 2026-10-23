@@ -11,6 +11,10 @@
     tank2LengthM: 3, tank2WidthM: 1.8, tank2HeightCm: 110,
     minConcentrationPct: 4.5, maxConcentrationPct: 5.5
   };
+  // O aprendizado corrige pequenas diferenças do modelo geométrico. Desvios
+  // maiores que ±50% indicam dados incompatíveis e não podem alterar doses futuras.
+  const MIN_CALIBRATION_FACTOR = 0.5;
+  const MAX_CALIBRATION_FACTOR = 1.5;
   function calculateTankVolume(heightCm, c = DEFAULT_CONFIG) {
     return c.tankLengthM * c.tankWidthM * (heightCm / 100) * 1000;
   }
@@ -41,15 +45,21 @@
     const volume = oilAddedLiters * (1 - cf) / (cf - ci);
     return Number.isFinite(volume) && volume > 0 ? volume : null;
   }
+  function isCalibrationFactorValid(factor) {
+    const value = Number(factor);
+    return Number.isFinite(value) && value >= MIN_CALIBRATION_FACTOR && value <= MAX_CALIBRATION_FACTOR;
+  }
   function calibrationStats(samples) {
-    const factors = samples.map(s => Number(s.factor)).filter(f => Number.isFinite(f) && f > 0).sort((a, b) => a - b);
-    if (!factors.length) return { sampleCount: 0, rawFactor: 1, appliedFactor: 1, confidence: 'MODELO GEOMÉTRICO' };
+    const allFactors = samples.map(s => Number(s.factor));
+    const factors = allFactors.filter(isCalibrationFactorValid).sort((a, b) => a - b);
+    const ignoredCount = allFactors.length - factors.length;
+    if (!factors.length) return { sampleCount: 0, ignoredCount, rawFactor: 1, appliedFactor: 1, confidence: 'MODELO GEOMÉTRICO' };
     const middle = Math.floor(factors.length / 2);
     const median = factors.length % 2 ? factors[middle] : (factors[middle - 1] + factors[middle]) / 2;
     const priorWeight = 3;
     const applied = (priorWeight + factors.length * median) / (priorWeight + factors.length);
     const confidence = factors.length < 3 ? 'CALIBRAÇÃO INICIAL' : factors.length < 6 ? 'CONFIANÇA BAIXA' : factors.length < 11 ? 'CONFIANÇA MODERADA' : 'CONFIANÇA MAIOR';
-    return { sampleCount: factors.length, rawFactor: median, appliedFactor: applied, confidence };
+    return { sampleCount: factors.length, ignoredCount, rawFactor: median, appliedFactor: applied, confidence };
   }
   function classifyConcentration(currentPct, c = DEFAULT_CONFIG) {
     if (currentPct < c.minConcentrationPct) return 'ABAIXO DA FAIXA';
@@ -98,7 +108,7 @@
     const alcoholToAddLiters = status === 'ABAIXO DA FAIXA' ? calculateOilToAdd(totalVolumeLiters, i.currentConcentrationPct, i.targetConcentrationPct) : 0;
     return { tank1VolumeLiters, tank2VolumeLiters, geometricVolumeLiters, totalVolumeLiters, calibrationFactor, status, alcoholToAddLiters, operationalAlcoholLiters: Math.floor(alcoholToAddLiters / 5) * 5, waterTargetPct: c.maxConcentrationPct, waterToAddLiters: status === 'ACIMA DA FAIXA' ? calculateWaterToAdd(totalVolumeLiters, i.currentConcentrationPct, c.maxConcentrationPct) : 0 };
   }
-  const api = { DEFAULT_CONFIG, DEFAULT_PICKLING_CONFIG, calculateTankVolume, calculateRectangularVolume, calculateBoxVolume, calculateOilToAdd, calculateWaterToAdd, inferObservedVolumeFromOil, calibrationStats, classifyConcentration, validateInputs, calculateAll, validatePicklingInputs, calculatePicklingAll };
+  const api = { DEFAULT_CONFIG, DEFAULT_PICKLING_CONFIG, MIN_CALIBRATION_FACTOR, MAX_CALIBRATION_FACTOR, calculateTankVolume, calculateRectangularVolume, calculateBoxVolume, calculateOilToAdd, calculateWaterToAdd, inferObservedVolumeFromOil, isCalibrationFactorValid, calibrationStats, classifyConcentration, validateInputs, calculateAll, validatePicklingInputs, calculatePicklingAll };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.EmulsionMath = api;
 })(typeof window !== 'undefined' ? window : globalThis);
