@@ -14,6 +14,9 @@ CALIBRAÇÃO ADAPTATIVA
 - O sistema infere o volume observado e ajusta gradualmente os próximos cálculos.
 - Não valide uma amostra se houve retirada de solução ou adição de água entre as medições.
 - O painel informa quantas validações existem e o nível de confiança do ajuste.
+- Se a medição mais recente estiver fora da faixa e exigir validação pós-correção, um novo registro do mesmo sistema fica bloqueado até a validação anterior ser concluída.
+- Se a medição mais recente estiver dentro da faixa, a validação não é necessária e o próximo registro permanece liberado.
+- Pendências antigas encerradas administrativamente continuam visíveis no histórico, mas não entram no aprendizado nem bloqueiam novos registros.
 
 PARÂMETROS PROTEGIDOS
 - Senha de acesso aos parâmetros técnicos: processo
