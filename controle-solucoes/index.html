@@ -7,13 +7,13 @@
   <title>Controle de Emulsão</title>
   <link rel="stylesheet" href="estilos.css?v=20261124-validation-gate">
   <link rel="stylesheet" href="modulos.css?v=20261022-optional-levels">
-  <link rel="stylesheet" href="relatorios.css?v=20261124-validation-gate">
+  <link rel="stylesheet" href="relatorios.css?v=20261124-startup-link">
   <link rel="stylesheet" href="online.css?v=20261022-optional-levels">
 </head>
 <body class="cloud-locked">
   <section id="cloudGate" class="cloud-gate" aria-live="polite"></section>
   <main class="app" id="application">
-    <header class="top"><div class="mark">◒</div><div><p class="eyebrow">CONTROLE OPERACIONAL · ONLINE</p><h1>Controle de soluções</h1><p>Óleo solúvel e decapagem em módulos independentes</p></div><div class="cloud-actions"><a href="../" class="outline">← Reduções</a><button id="logoutCloud" class="outline" type="button">Sair</button><div class="local"><i></i><span id="cloudState">Sincronizando</span></div></div></header>
+    <header class="top"><div class="mark">◒</div><div><p class="eyebrow">CONTROLE OPERACIONAL · ONLINE</p><h1>Controle de soluções</h1><p>Óleo solúvel e decapagem em módulos independentes</p></div><div class="top-actions"><div class="global-report-actions" aria-label="Relatórios gerais"><button id="historyReportButton" type="button">Histórico de registros</button><button id="startupReportButton" type="button">Partida de laminação</button><button id="detailedReportButton" type="button">PDF detalhado com fotos</button></div><div class="cloud-actions"><a href="../" class="outline">← Reduções</a><button id="logoutCloud" class="outline" type="button">Sair</button><div class="local"><i></i><span id="cloudState">Sincronizando</span></div></div></div></header>
     <div class="system-switch"><button class="active" data-system="oil">Óleo solúvel</button><button data-system="pickling">Decapagem</button></div>
     <nav class="tabs oil-content" aria-label="Seções de óleo solúvel"><button class="active" data-tab="calculo">▣ Cálculo</button><button data-tab="historico">◷ Histórico <b id="count">0</b></button><button data-tab="metodo">ⓘ Método</button></nav>
 
@@ -68,6 +68,6 @@
   </main>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../config.js"></script>
-  <script src="online.js?v=20261124-validation-gate"></script>
+  <script src="online.js?v=20261124-pdf-colors"></script>
 </body>
 </html>

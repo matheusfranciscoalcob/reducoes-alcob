@@ -52,11 +52,13 @@ ANÁLISES E FOTOGRAFIAS
 - O novo backup “com fotos” inclui registros, análises e fotografias.
 
 RELATÓRIO PDF
-- Abra o histórico do sistema desejado.
-- Informe a data inicial e a data final.
-- Clique em “Relatório diário consolidado” para reunir, por data, as concentrações iniciais e corrigidas do óleo solúvel e da decapagem, com os respectivos horários.
+- Os três botões de relatório ficam no canto superior direito e permanecem disponíveis em qualquer módulo ou seção.
+- Clique em “Histórico de registros” para reunir, por data e período, as concentrações iniciais e corrigidas do óleo solúvel e da decapagem, com os respectivos horários.
 - As datas são apresentadas da mais recente para a mais antiga.
-- O botão “PDF detalhado com fotos” mantém o relatório completo de cada sistema com análises e fotografias.
+- Em “Partida de laminação”, escolha a data e gere o relatório operacional com somente o último estado do óleo solúvel e da decapagem.
+- Quando houve correção obrigatória por baixa concentração, esse relatório mostra também a concentração inicial, as alturas utilizadas e a dosagem indicada.
+- Concentrações acima da faixa aparecem com sugestão opcional de água e não impedem a partida.
+- O botão “PDF detalhado com fotos” reúne óleo solúvel e decapagem, com análises e fotografias, em ordem da data mais recente para a mais antiga.
 - Na janela de impressão, escolha “Salvar como PDF” ou a impressora PDF disponível no computador.
 - Talvez seja necessário permitir pop-ups para o arquivo local.
 
