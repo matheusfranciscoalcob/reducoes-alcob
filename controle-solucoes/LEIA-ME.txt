@@ -3,8 +3,10 @@ CONTROLE DE SOLUÇÕES — APLICAÇÃO ONLINE
 1. Acesse o módulo “Controle de soluções” no projeto Reduções ALCOB.
 2. Entre com uma conta aprovada do projeto.
 3. Preencha a concentração atual. As duas alturas só são obrigatórias quando houver correção.
-4. Use “Registrar medição” para guardar o resultado no histórico compartilhado.
+4. Use “Registrar medição” para calcular e guardar o resultado no histórico compartilhado. O cálculo não é executado durante a digitação.
 5. O histórico, as análises e as fotografias são sincronizados pelo Supabase. O backup continua disponível para exportação de segurança.
+- Um registro idêntico no mesmo dia é recusado; medições diferentes no mesmo dia continuam permitidas.
+- Quando uma correção precisa de validação, um alerta permanece visível até o preenchimento da concentração posterior.
 
 CALIBRAÇÃO ADAPTATIVA
 - Depois de corrigir e homogeneizar, abra o Histórico e clique em “Validar resultado”.
@@ -49,8 +51,9 @@ ANÁLISES E FOTOGRAFIAS
 RELATÓRIO PDF
 - Abra o histórico do sistema desejado.
 - Informe a data inicial e a data final.
-- Clique em “Gerar relatório PDF”.
-- O navegador abrirá o relatório com os dados e fotografias de cada amostra.
+- Clique em “Relatório diário consolidado” para reunir, por data, as concentrações iniciais e corrigidas do óleo solúvel e da decapagem, com os respectivos horários.
+- As datas são apresentadas da mais recente para a mais antiga.
+- O botão “PDF detalhado com fotos” mantém o relatório completo de cada sistema com análises e fotografias.
 - Na janela de impressão, escolha “Salvar como PDF” ou a impressora PDF disponível no computador.
 - Talvez seja necessário permitir pop-ups para o arquivo local.
 
